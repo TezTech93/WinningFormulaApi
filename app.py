@@ -6,8 +6,6 @@ import logging
 app = FastAPI()
 
 app.include_router(users_router.router) #users
-app.include_router(sports_router.router) #sports
-app.include_router(metrics_router.router) #metrics
 
 app.add_middleware(
     CORSMiddleware,
