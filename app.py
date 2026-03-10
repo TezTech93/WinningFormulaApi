@@ -1,7 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import Metrics.routes as metrics_router
-import Sports.routes as sports_router
 import Users.routes as users_router
 import logging
 
