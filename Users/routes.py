@@ -2,8 +2,6 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 import bcrypt
-import psycopg2
-from psycopg2 import pool
 import os
 from typing import Optional
 from jose import jwt, JWTError
@@ -15,9 +13,8 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-# Database connection pool
-DATABASE_URL = os.getenv("DATABASE_URL")
-connection_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn=DATABASE_URL)
+# Database path - can be set via environment variable
+DB_PATH = os.getenv("SQLITE_DB_PATH", "winners_formula.db")
 
 router = APIRouter(prefix="/users", tags=["users"])
 security = HTTPBearer()
@@ -65,16 +62,9 @@ class UserTierUpdate(BaseModel):
     tier: str  # FREE, PAID, PLUS
 
 # Helper functions
-def get_db():
-    """Get database connection from pool"""
-    try:
-        conn = connection_pool.getconn()
-        yield conn
-    finally:
-        connection_pool.putconn(conn)
-
-def get_user_manager(conn: psycopg2.extensions.connection = Depends(get_db)):
-    return UserManager(conn)
+def get_user_manager():
+    """Get UserManager instance"""
+    return UserManager(DB_PATH)
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
@@ -111,7 +101,7 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials"
             )
-    except jwt.PyJWTError:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials"
@@ -123,15 +113,6 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
-    
-    # Get user tier
-    with user_manager.connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT tier FROM users WHERE id = %s",
-            (user_id,)
-        )
-        result = cursor.fetchone()
-        user["tier"] = result[0] if result else "FREE"
     
     return user
 
@@ -160,17 +141,8 @@ async def register_user(
             password_hash=password_hash
         )
         
-        # Set default tier to FREE
-        with user_manager.connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE users SET tier = 'FREE' WHERE id = %s",
-                (user_id,)
-            )
-            user_manager.connection.commit()
-        
         # Get created user
         user = user_manager.get_user_by_id(user_id)
-        user["tier"] = "FREE"
         
         # Create access token
         access_token = create_access_token(data={"sub": str(user_id)})
@@ -201,25 +173,18 @@ async def login_user(
         )
     
     # Verify password
-    with user_manager.connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT password_hash FROM users WHERE id = %s",
-            (user["id"],)
+    conn = user_manager.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT password_hash FROM users WHERE id = ?",
+        (user["id"],)
+    )
+    result = cursor.fetchone()
+    if not result or not verify_password(login_data.password, result[0]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
         )
-        result = cursor.fetchone()
-        if not result or not verify_password(login_data.password, result[0]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-        
-        # Get user tier
-        cursor.execute(
-            "SELECT tier FROM users WHERE id = %s",
-            (user["id"],)
-        )
-        tier_result = cursor.fetchone()
-        user["tier"] = tier_result[0] if tier_result else "FREE"
     
     # Create access token
     access_token = create_access_token(data={"sub": str(user["id"])})
@@ -245,17 +210,18 @@ async def update_password(
 ):
     """Update user password"""
     # Verify current password
-    with user_manager.connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT password_hash FROM users WHERE id = %s",
-            (current_user["id"],)
+    conn = user_manager.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT password_hash FROM users WHERE id = ?",
+        (current_user["id"],)
+    )
+    result = cursor.fetchone()
+    if not result or not verify_password(password_data.current_password, result[0]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
         )
-        result = cursor.fetchone()
-        if not result or not verify_password(password_data.current_password, result[0]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
-            )
     
     # Update password
     new_password_hash = hash_password(password_data.new_password)
@@ -336,7 +302,7 @@ async def delete_formula(
             detail="Formula not found"
         )
 
-# Admin routes (you might want to add admin authentication)
+# Admin routes
 @router.put("/{user_id}/tier", response_model=UserResponse)
 async def update_user_tier(
     user_id: int,
@@ -364,3 +330,10 @@ async def update_user_tier(
     user = user_manager.get_user_by_id(user_id)
     user["tier"] = tier_data.tier
     return user
+
+# Clean up connections when the app shuts down
+@router.on_event("shutdown")
+async def shutdown_event():
+    """Close all database connections on shutdown"""
+    # Note: You might want to implement connection tracking if you have multiple instances
+    pass
