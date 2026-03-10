@@ -6,7 +6,7 @@ import psycopg2
 from psycopg2 import pool
 import os
 from typing import Optional
-import jwt
+from jose import jwt, JWTError
 import datetime
 from .manager import UserManager
 
