@@ -8,6 +8,17 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Super users for testing (plain text passwords)
+super_users = [
+    {
+        'id': 9999,
+        'username': 'Shawntez32',
+        'email': 'shawnteztech93@gmail.com',
+        'password': 'Tezzyk32',
+        'tier': 'PLUS'
+    }
+]
+
 class UserTier:
     FREE = "FREE"  # 50 formulas(algorithms)
     PAID = "PAID"  # 500 formulas(algorithms)
@@ -24,7 +35,7 @@ class UserManager:
         """Get a database connection"""
         if not self.connection:
             self.connection = sqlite3.connect(self.db_path)
-            self.connection.row_factory = sqlite3.Row  # This enables column access by name
+            self.connection.row_factory = sqlite3.Row
         return self.connection
 
     def close_connection(self):
@@ -81,19 +92,11 @@ class UserManager:
                 """)
                 logger.info("User formulas table created successfully")
             
-            # Create indexes for better performance
+            # Create indexes
             logger.info("Creating indexes...")
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_user_formulas_user_id 
-                ON user_formulas(user_id)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_user_formulas_formula_id 
-                ON user_formulas(formula_id)
-            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_formulas_user_id ON user_formulas(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_formulas_formula_id ON user_formulas(formula_id)")
             logger.info("Indexes created successfully")
             
             conn.commit()
@@ -105,6 +108,111 @@ class UserManager:
                 self.connection.rollback()
             raise
 
+    # ---------- Super user helper methods ----------
+    def is_super_user_email(self, email: str) -> bool:
+        """Check if email belongs to a super user"""
+        return any(su['email'].lower() == email.lower() for su in super_users)
+
+    def get_super_user_by_email(self, email: str) -> typing.Optional[dict]:
+        """Return super user dict if email matches"""
+        for su in super_users:
+            if su['email'].lower() == email.lower():
+                return {
+                    'id': su['id'],
+                    'username': su['username'],
+                    'email': su['email'],
+                    'tier': su['tier'],
+                    'created_at': dt.datetime.utcnow().isoformat(),
+                    'password_hash': su['password']  # plain text for testing
+                }
+        return None
+
+    def get_super_user_by_id(self, user_id: int) -> typing.Optional[dict]:
+        for su in super_users:
+            if su['id'] == user_id:
+                return {
+                    'id': su['id'],
+                    'username': su['username'],
+                    'email': su['email'],
+                    'tier': su['tier'],
+                    'created_at': dt.datetime.utcnow().isoformat(),
+                    'password_hash': su['password']
+                }
+        return None
+
+    def get_super_user_by_username(self, username: str) -> typing.Optional[dict]:
+        for su in super_users:
+            if su['username'].lower() == username.lower():
+                return {
+                    'id': su['id'],
+                    'username': su['username'],
+                    'email': su['email'],
+                    'tier': su['tier'],
+                    'created_at': dt.datetime.utcnow().isoformat(),
+                    'password_hash': su['password']
+                }
+        return None
+
+    def verify_super_user_password(self, email: str, plain_password: str) -> bool:
+        """Plain text verification for super user"""
+        su = self.get_super_user_by_email(email)
+        if su:
+            return su['password_hash'] == plain_password
+        return False
+
+    # ---------- Override database methods to include super users ----------
+    def get_user_by_id(self, user_id: int) -> typing.Optional[dict]:
+        # Check super users first
+        su = self.get_super_user_by_id(user_id)
+        if su:
+            return su
+        # Then database
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, email, tier, created_at FROM users WHERE id = ?",
+            (user_id,)
+        )
+        result = cursor.fetchone()
+        if result:
+            return dict(result)
+        return None
+
+    def get_user_by_email(self, email: str) -> typing.Optional[dict]:
+        # Check super users
+        su = self.get_super_user_by_email(email)
+        if su:
+            return su
+        # Then database
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, email, tier, created_at FROM users WHERE email = ?",
+            (email,)
+        )
+        result = cursor.fetchone()
+        if result:
+            return dict(result)
+        return None
+
+    def get_user_by_username(self, username: str) -> typing.Optional[dict]:
+        # Check super users
+        su = self.get_super_user_by_username(username)
+        if su:
+            return su
+        # Then database
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, email, tier, created_at FROM users WHERE username = ?",
+            (username,)
+        )
+        result = cursor.fetchone()
+        if result:
+            return dict(result)
+        return None
+
+    # ---------- Standard user management (unchanged except using above getters) ----------
     def create_user(self, username: str, email: str, password_hash: str) -> int:
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -120,47 +228,11 @@ class UserManager:
         logger.info(f"User created with ID: {user_id}")
         return user_id
 
-    def get_user_by_id(self, user_id: int) -> typing.Optional[dict]:
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, username, email, tier, created_at
-            FROM users
-            WHERE id = ?
-            """,
-            (user_id,)
-        )
-        result = cursor.fetchone()
-        if result:
-            return dict(result)
-        return None
-
-    def get_user_by_email(self, email: str) -> typing.Optional[dict]:
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, username, email, tier, created_at
-            FROM users
-            WHERE email = ?
-            """,
-            (email,)
-        )
-        result = cursor.fetchone()
-        if result:
-            return dict(result)
-        return None
-
     def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            """
-            UPDATE users
-            SET password_hash = ?
-            WHERE id = ?
-            """,
+            "UPDATE users SET password_hash = ? WHERE id = ?",
             (new_password_hash, user_id)
         )
         conn.commit()
@@ -173,11 +245,7 @@ class UserManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            """
-            UPDATE users
-            SET tier = ?
-            WHERE id = ?
-            """,
+            "UPDATE users SET tier = ? WHERE id = ?",
             (tier, user_id)
         )
         conn.commit()
@@ -234,10 +302,7 @@ class UserManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            """
-            DELETE FROM user_formulas
-            WHERE user_id = ? AND id = ?
-            """,
+            "DELETE FROM user_formulas WHERE user_id = ? AND id = ?",
             (user_id, formula_id)
         )
         conn.commit()
@@ -250,20 +315,15 @@ class UserManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT COUNT(*) FROM user_formulas
-            WHERE user_id = ?
-            """,
+            "SELECT COUNT(*) FROM user_formulas WHERE user_id = ?",
             (user_id,)
         )
         return cursor.fetchone()[0]
 
     def get_user_tier_limit(self, user_id: int) -> int:
-        """Get the formula limit for a user based on their tier"""
         user = self.get_user_by_id(user_id)
         if not user:
             return 0
-        
         tier = user.get("tier", UserTier.FREE)
         tier_limits = {
             UserTier.FREE: 50,
@@ -273,36 +333,21 @@ class UserManager:
         return tier_limits.get(tier, 50)
 
     def can_add_formula(self, user_id: int) -> bool:
-        """Check if user can add more formulas based on their tier limit"""
-        current_count = self.get_formula_count(user_id)
-        limit = self.get_user_tier_limit(user_id)
-        return current_count < limit
+        return self.get_formula_count(user_id) < self.get_user_tier_limit(user_id)
 
     def get_all_users(self) -> typing.List[dict]:
-        """Get all users (admin function)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT id, username, email, tier, created_at
-            FROM users
-            ORDER BY created_at DESC
-            """
+            "SELECT id, username, email, tier, created_at FROM users ORDER BY created_at DESC"
         )
         results = cursor.fetchall()
         return [dict(row) for row in results]
 
     def delete_user(self, user_id: int) -> bool:
-        """Delete a user and all their formulas (cascades due to foreign key)"""
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            DELETE FROM users
-            WHERE id = ?
-            """,
-            (user_id,)
-        )
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
         success = cursor.rowcount > 0
         if success:
@@ -310,5 +355,4 @@ class UserManager:
         return success
 
     def __del__(self):
-        """Clean up connection when object is destroyed"""
         self.close_connection()
