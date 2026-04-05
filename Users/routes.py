@@ -33,7 +33,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
-    created_at: str  # changed to str for simplicity with super users
+    created_at: str
     tier: Optional[str] = "FREE"
 
 class TokenResponse(BaseModel):
@@ -146,38 +146,49 @@ async def login_user(
     login_data: UserLogin,
     user_manager: UserManager = Depends(get_user_manager)
 ):
-    user = user_manager.get_user_by_email(login_data.email)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    print(f"Login attempt: {login_data.email}")
     
-    # Determine if super user (plain text) or normal user (bcrypt)
-    is_super = user_manager.is_super_user_email(login_data.email)
-    password_valid = False
-    if is_super:
-        password_valid = user_manager.verify_super_user_password(login_data.email, login_data.password)
-    else:
+    # First check super users (plain text)
+    super_user = user_manager.get_super_user_by_email(login_data.email)
+    if super_user and super_user['password_hash'] == login_data.password:
+        print("Super user authenticated")
+        access_token = create_access_token(data={"sub": str(super_user["id"])})
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": super_user["id"],
+                "username": super_user["username"],
+                "email": super_user["email"],
+                "created_at": super_user["created_at"],
+                "tier": super_user["tier"]
+            }
+        }
+    
+    # Then check normal users (bcrypt)
+    user = user_manager.get_user_by_email(login_data.email)
+    if user:
         conn = user_manager.get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT password_hash FROM users WHERE id = ?", (user["id"],))
         result = cursor.fetchone()
-        if result:
-            password_valid = verify_password(login_data.password, result[0])
+        if result and verify_password(login_data.password, result[0]):
+            print("Normal user authenticated")
+            access_token = create_access_token(data={"sub": str(user["id"])})
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": {
+                    "id": user["id"],
+                    "username": user["username"],
+                    "email": user["email"],
+                    "created_at": user["created_at"],
+                    "tier": user["tier"]
+                }
+            }
     
-    if not password_valid:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    access_token = create_access_token(data={"sub": str(user["id"])})
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "created_at": user["created_at"],
-            "tier": user["tier"]
-        }
-    }
+    print("Authentication failed")
+    raise HTTPException(status_code=401, detail="Invalid email or password")
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
