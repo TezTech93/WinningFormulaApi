@@ -3,6 +3,7 @@ import typing
 import sqlite3
 import logging
 import os
+import tempfile
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -14,8 +15,14 @@ class UserTier:
     PLUS = "PLUS"  # 2000 formulas(algorithms)
 
 class UserManager:
-    def __init__(self, db_path: str = "winners_formula.db"):
+    def __init__(self, db_path: str = None):
         """Initialize with SQLite database path"""
+        if db_path is None:
+            # Use /tmp directory on Render, local directory otherwise
+            if os.environ.get('RENDER'):
+                db_path = os.path.join('/tmp', 'winners_formula.db')
+            else:
+                db_path = 'winners_formula.db'
         self.db_path = db_path
         self.connection = None
         self.init_db()
