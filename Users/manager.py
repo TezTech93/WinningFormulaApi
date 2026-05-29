@@ -35,26 +35,21 @@ class UserManager:
             else:
                 db_path = 'winners_formula.db'
         self.db_path = db_path
-        self.connection = None
+        # Don't store persistent connection - create per request to avoid threading issues
         self.init_db()
 
     def get_connection(self):
-        """Get a database connection"""
-        if not self.connection:
-            self.connection = sqlite3.connect(self.db_path)
-            self.connection.row_factory = sqlite3.Row
-        return self.connection
-
-    def close_connection(self):
-        """Close the database connection"""
-        if self.connection:
-            self.connection.close()
-            self.connection = None
+        """Get a new database connection for the current thread"""
+        # Use check_same_thread=False to allow usage across threads
+        # But we'll create a new connection each time to be safe
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def init_db(self):
         """Initialize database tables if they don't exist"""
+        conn = self.get_connection()
         try:
-            conn = self.get_connection()
             cursor = conn.cursor()
             
             # Check if tables exist
@@ -111,9 +106,10 @@ class UserManager:
                 
         except Exception as e:
             logger.error(f"Error initializing database: {str(e)}")
-            if self.connection:
-                self.connection.rollback()
+            conn.rollback()
             raise
+        finally:
+            conn.close()
 
     # ---------- Super user helper methods ----------
     def is_super_user_email(self, email: str) -> bool:
@@ -167,170 +163,206 @@ class UserManager:
             return su['password_hash'] == plain_password
         return False
 
-    # ---------- Override database methods to include super users ----------
+    # ---------- Database methods with proper connection handling ----------
     def get_user_by_id(self, user_id: int) -> typing.Optional[dict]:
         # Check super users first
         su = self.get_super_user_by_id(user_id)
         if su:
             return su
+        
         # Then database
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, username, email, tier, created_at FROM users WHERE id = ?",
-            (user_id,)
-        )
-        result = cursor.fetchone()
-        if result:
-            return dict(result)
-        return None
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, username, email, tier, created_at FROM users WHERE id = ?",
+                (user_id,)
+            )
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+            return None
+        finally:
+            conn.close()
 
     def get_user_by_email(self, email: str) -> typing.Optional[dict]:
         # Check super users
         su = self.get_super_user_by_email(email)
         if su:
             return su
+        
         # Then database
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, username, email, tier, created_at FROM users WHERE email = ?",
-            (email,)
-        )
-        result = cursor.fetchone()
-        if result:
-            return dict(result)
-        return None
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, username, email, tier, created_at FROM users WHERE email = ?",
+                (email,)
+            )
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+            return None
+        finally:
+            conn.close()
 
     def get_user_by_username(self, username: str) -> typing.Optional[dict]:
         # Check super users
         su = self.get_super_user_by_username(username)
         if su:
             return su
+        
         # Then database
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, username, email, tier, created_at FROM users WHERE username = ?",
-            (username,)
-        )
-        result = cursor.fetchone()
-        if result:
-            return dict(result)
-        return None
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, username, email, tier, created_at FROM users WHERE username = ?",
+                (username,)
+            )
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+            return None
+        finally:
+            conn.close()
 
-    # ---------- Standard user management (unchanged except using above getters) ----------
     def create_user(self, username: str, email: str, password_hash: str) -> int:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO users (username, email, password_hash, tier, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (username, email, password_hash, UserTier.FREE, dt.datetime.utcnow())
-        )
-        conn.commit()
-        user_id = cursor.lastrowid
-        logger.info(f"User created with ID: {user_id}")
-        return user_id
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO users (username, email, password_hash, tier, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (username, email, password_hash, UserTier.FREE, dt.datetime.utcnow())
+            )
+            conn.commit()
+            user_id = cursor.lastrowid
+            logger.info(f"User created with ID: {user_id}")
+            return user_id
+        finally:
+            conn.close()
 
     def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            (new_password_hash, user_id)
-        )
-        conn.commit()
-        success = cursor.rowcount > 0
-        if success:
-            logger.info(f"Password updated for user ID: {user_id}")
-        return success
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (new_password_hash, user_id)
+            )
+            conn.commit()
+            success = cursor.rowcount > 0
+            if success:
+                logger.info(f"Password updated for user ID: {user_id}")
+            return success
+        finally:
+            conn.close()
 
     def update_user_tier(self, user_id: int, tier: str) -> bool:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE users SET tier = ? WHERE id = ?",
-            (tier, user_id)
-        )
-        conn.commit()
-        success = cursor.rowcount > 0
-        if success:
-            logger.info(f"Tier updated to {tier} for user ID: {user_id}")
-        return success
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE users SET tier = ? WHERE id = ?",
+                (tier, user_id)
+            )
+            conn.commit()
+            success = cursor.rowcount > 0
+            if success:
+                logger.info(f"Tier updated to {tier} for user ID: {user_id}")
+            return success
+        finally:
+            conn.close()
 
     def add_user_formula(self, user_id: int, formula_id: int, formula_name: str, formula: str):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO user_formulas (user_id, formula_id, formula_name, formula, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (user_id, formula_id, formula_name, formula, dt.datetime.utcnow())
-        )
-        conn.commit()
-        logger.info(f"Formula added for user ID: {user_id}, formula ID: {formula_id}")
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO user_formulas (user_id, formula_id, formula_name, formula, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (user_id, formula_id, formula_name, formula, dt.datetime.utcnow())
+            )
+            conn.commit()
+            logger.info(f"Formula added for user ID: {user_id}, formula ID: {formula_id}")
+        finally:
+            conn.close()
 
     def get_user_formulas(self, user_id: int) -> typing.List[dict]:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, user_id, formula_id, formula_name, formula, created_at
-            FROM user_formulas
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-            """,
-            (user_id,)
-        )
-        results = cursor.fetchall()
-        return [dict(row) for row in results]
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, user_id, formula_id, formula_name, formula, created_at
+                FROM user_formulas
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                """,
+                (user_id,)
+            )
+            results = cursor.fetchall()
+            return [dict(row) for row in results]
+        finally:
+            conn.close()
 
     def get_formula_by_id(self, user_id: int, formula_record_id: int) -> typing.Optional[dict]:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, user_id, formula_id, formula_name, formula, created_at
-            FROM user_formulas
-            WHERE user_id = ? AND id = ?
-            """,
-            (user_id, formula_record_id)
-        )
-        result = cursor.fetchone()
-        if result:
-            return dict(result)
-        return None
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, user_id, formula_id, formula_name, formula, created_at
+                FROM user_formulas
+                WHERE user_id = ? AND id = ?
+                """,
+                (user_id, formula_record_id)
+            )
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+            return None
+        finally:
+            conn.close()
 
     def delete_user_formula(self, user_id: int, formula_id: int) -> bool:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM user_formulas WHERE user_id = ? AND id = ?",
-            (user_id, formula_id)
-        )
-        conn.commit()
-        success = cursor.rowcount > 0
-        if success:
-            logger.info(f"Formula ID {formula_id} deleted for user ID: {user_id}")
-        return success
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM user_formulas WHERE user_id = ? AND id = ?",
+                (user_id, formula_id)
+            )
+            conn.commit()
+            success = cursor.rowcount > 0
+            if success:
+                logger.info(f"Formula ID {formula_id} deleted for user ID: {user_id}")
+            return success
+        finally:
+            conn.close()
 
     def get_formula_count(self, user_id: int) -> int:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) FROM user_formulas WHERE user_id = ?",
-            (user_id,)
-        )
-        return cursor.fetchone()[0]
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM user_formulas WHERE user_id = ?",
+                (user_id,)
+            )
+            return cursor.fetchone()[0]
+        finally:
+            conn.close()
 
     def get_user_tier_limit(self, user_id: int) -> int:
         user = self.get_user_by_id(user_id)
         if not user:
             return 0
+        
         tier = user.get("tier", UserTier.FREE)
         tier_limits = {
             UserTier.FREE: 50,
@@ -340,26 +372,38 @@ class UserManager:
         return tier_limits.get(tier, 50)
 
     def can_add_formula(self, user_id: int) -> bool:
-        return self.get_formula_count(user_id) < self.get_user_tier_limit(user_id)
+        """Check if user can add more formulas based on their tier limit"""
+        current_count = self.get_formula_count(user_id)
+        limit = self.get_user_tier_limit(user_id)
+        return current_count < limit
 
     def get_all_users(self) -> typing.List[dict]:
+        """Get all users (admin function)"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, username, email, tier, created_at FROM users ORDER BY created_at DESC"
-        )
-        results = cursor.fetchall()
-        return [dict(row) for row in results]
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, username, email, tier, created_at
+                FROM users
+                ORDER BY created_at DESC
+                """
+            )
+            results = cursor.fetchall()
+            return [dict(row) for row in results]
+        finally:
+            conn.close()
 
     def delete_user(self, user_id: int) -> bool:
+        """Delete a user and all their formulas (cascades due to foreign key)"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        conn.commit()
-        success = cursor.rowcount > 0
-        if success:
-            logger.info(f"User ID {user_id} deleted")
-        return success
-
-    def __del__(self):
-        self.close_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+            if success:
+                logger.info(f"User ID {user_id} deleted")
+            return success
+        finally:
+            conn.close()
