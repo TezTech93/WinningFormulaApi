@@ -29,6 +29,11 @@ class BaseSport(ABC):
         """Get team abbreviation from full name"""
         pass
     
+    @abstractmethod
+    async def get_team_stats(self, team: str, year: str) -> List[Dict]:
+        """Get team stats from API"""
+        pass
+    
     def _init_database(self):
         """Initialize SQLite database for this sport"""
         conn = sqlite3.connect(self.db_path)
