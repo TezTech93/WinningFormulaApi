@@ -1,27 +1,18 @@
 # models/gameline.py
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-
 from core.database import Base
-
-class Sport(str, enum.Enum):
-    NFL = "nfl"
-    NBA = "nba"
-    MLB = "mlb"
-    NHL = "nhl"
-    NCAAF = "ncaaf"
-    NCAAB = "ncaab"
 
 class Gameline(Base):
     __tablename__ = "gamelines"
     
     id = Column(Integer, primary_key=True, index=True)
-    sport = Column(String(10), nullable=False)
-    source = Column(String(50), nullable=False)  # espn_bets, draftkings, etc.
-    game_id = Column(String(50), nullable=False)
-    home_team = Column(String(100), nullable=False)
-    away_team = Column(String(100), nullable=False)
+    sport = Column(String(10), nullable=False, index=True)
+    source = Column(String(50), nullable=False)
+    game_id = Column(String(50), nullable=False, index=True)
+    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     home_abbr = Column(String(10), nullable=False)
     away_abbr = Column(String(10), nullable=False)
     home_ml = Column(Integer, nullable=True)
@@ -33,7 +24,20 @@ class Gameline(Base):
     total = Column(Float, nullable=True)
     over_odds = Column(Integer, nullable=True)
     under_odds = Column(Integer, nullable=True)
-    game_date = Column(DateTime, nullable=False)
+    game_date = Column(DateTime, nullable=False, index=True)
     start_time = Column(String(20), nullable=True)
+    is_completed = Column(Boolean, default=False)
+    home_score = Column(Integer, nullable=True)
+    away_score = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    home_team = relationship("Team", foreign_keys=[home_team_id])
+    away_team = relationship("Team", foreign_keys=[away_team_id])
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_gamelines_sport_date', 'sport', 'game_date'),
+        Index('idx_gamelines_completed', 'is_completed'),
+    )
