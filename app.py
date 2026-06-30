@@ -11,7 +11,7 @@ import time
 
 from core.config import settings
 from core.database import init_db, check_db_connection
-from sports import SportsManager
+from Sports import SportsManager
 from utils.cleanup import cleanup_gamelines
 
 # Set up logging
