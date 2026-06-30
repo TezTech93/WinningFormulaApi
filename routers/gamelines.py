@@ -9,7 +9,7 @@ from core.dependencies import get_current_user
 from managers.gameline_manager import GamelineManager
 from services.sports_api import SportsAPIService
 from models.user import User
-from models.gameline import Gameline
+from models.gamelines import Gameline
 
 router = APIRouter(prefix="/gamelines", tags=["gamelines"])
 sports_api = SportsAPIService()
