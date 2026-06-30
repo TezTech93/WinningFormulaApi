@@ -3,12 +3,12 @@ from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime, timedelta
 
-from sports.nfl.api import NFLSport
-from sports.nba.api import NBASport
-from sports.mlb.api import MLBSport
-from sports.nhl.api import NHLSport
-from sports.ncaaf.api import NCAAFSport
-from sports.ncaab.api import NCAABSport
+from Sports.nfl.api import NFLSport
+from Sports.nba.api import NBASport
+from Sports.mlb.api import MLBSport
+from Sports.nhl.api import NHLSport
+from Sports.ncaaf.api import NCAAFSport
+from Sports.ncaab.api import NCAABSport
 from core.config import settings
 
 logger = logging.getLogger(__name__)

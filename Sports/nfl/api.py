@@ -1,5 +1,5 @@
 # sports/nfl/api.py
-from sports.base_sport import BaseSport
+from Sports.base_sport import BaseSport
 from typing import Dict, Any, List, Optional
 import logging
 

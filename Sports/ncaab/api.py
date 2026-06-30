@@ -1,5 +1,5 @@
 # sports/ncaab/api.py
-from sports.base_sport import BaseSport
+from Sports.base_sport import BaseSport
 from typing import Dict, Any, List, Optional
 import logging
 from utils.ncaab_teams import get_ncaab_team_by_abbr
