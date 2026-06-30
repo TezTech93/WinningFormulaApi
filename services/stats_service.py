@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
 from models.team import Team, TeamStats
-from models.gameline import Gameline
+from models.gamelines import Gameline
 
 logger = logging.getLogger(__name__)
 
