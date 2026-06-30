@@ -1,14 +1,8 @@
-# sports/manager.py
+# Sports/manager.py
 from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime, timedelta
 
-from Sports.nfl.api import NFLSport
-from Sports.nba.api import NBASport
-from Sports.mlb.api import MLBSport
-from Sports.nhl.api import NHLSport
-from Sports.ncaaf.api import NCAAFSport
-from Sports.ncaab.api import NCAABSport
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -23,22 +17,43 @@ def get_sport_instance(sport: str):
     if sport in _sport_instances:
         return _sport_instances[sport]
     
-    sport_map = {
-        'nfl': (NFLSport, settings.NFL_API_URL),
-        'nba': (NBASport, settings.NBA_API_URL),
-        'mlb': (MLBSport, settings.MLB_API_URL),
-        'nhl': (NHLSport, settings.NHL_API_URL),
-        'ncaaf': (NCAAFSport, settings.NCAAF_API_URL),
-        'ncaab': (NCAABSport, settings.NCAAB_API_URL),
-    }
-    
-    if sport not in sport_map:
+    # Lazy import to avoid circular dependencies - Using 'Sports' folder
+    if sport == 'nfl':
+        from Sports.nfl.api import NFLSport
+        sport_class = NFLSport
+    elif sport == 'nba':
+        from Sports.nba.api import NBASport
+        sport_class = NBASport
+    elif sport == 'mlb':
+        from Sports.mlb.api import MLBSport
+        sport_class = MLBSport
+    elif sport == 'nhl':
+        from Sports.nhl.api import NHLSport
+        sport_class = NHLSport
+    elif sport == 'ncaaf':
+        from Sports.ncaaf.api import NCAAFSport
+        sport_class = NCAAFSport
+    elif sport == 'ncaab':
+        from Sports.ncaab.api import NCAABSport
+        sport_class = NCAABSport
+    else:
         raise ValueError(f"Unsupported sport: {sport}")
     
-    sport_class, api_url = sport_map[sport]
+    sport_map = {
+        'nfl': settings.NFL_API_URL,
+        'nba': settings.NBA_API_URL,
+        'mlb': settings.MLB_API_URL,
+        'nhl': settings.NHL_API_URL,
+        'ncaaf': settings.NCAAF_API_URL,
+        'ncaab': settings.NCAAB_API_URL,
+    }
+    
+    api_url = sport_map.get(sport)
+    if not api_url:
+        raise ValueError(f"No API URL configured for sport: {sport}")
+    
     instance = sport_class(api_url)
     _sport_instances[sport] = instance
-    
     return instance
 
 class SportsManager:
