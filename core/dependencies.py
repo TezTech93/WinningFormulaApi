@@ -3,15 +3,29 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
-from jose import jwt, JWTError
+from jose import JWTError
+import jwt
+import os
 
 from core.database import get_db
 from core.config import settings
-from core.security import decode_access_token
-from models.user import User
 from managers.user_manager import UserManager
+from models.user import User
 
 security = HTTPBearer()
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "khi-my-guy-always365")
+ALGORITHM = "HS256"
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -54,9 +68,8 @@ async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """
-    Get the current active user (could add additional checks here)
+    Get the current active user
     """
-    # Add any additional checks here (e.g., email verified, account active, etc.)
     return current_user
 
 async def get_current_user_optional(

@@ -2,6 +2,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -45,20 +46,18 @@ async def startup_event():
     logger.info("Initializing database...")
     init_db()
     
-    # Check database connection
     if check_db_connection():
         logger.info("Database connection successful")
     else:
         logger.error("Database connection failed")
     
-    # Start background cleanup thread
     def cleanup_loop():
         while True:
             try:
                 cleanup_gamelines()
             except Exception as e:
                 logger.error(f"Error in cleanup loop: {e}")
-            time.sleep(3600)  # Run every hour
+            time.sleep(3600)
     
     cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
     cleanup_thread.start()
@@ -67,18 +66,19 @@ async def startup_event():
 # Import routers
 from routers import auth, users, formulas, gamelines, stats
 
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(formulas.router)
-app.include_router(gamelines.router)
-app.include_router(stats.router)
+# Include all routers
+app.include_router(auth.router)      # /auth/login, /auth/register
+app.include_router(users.router)      # /users/me, /users/me/password
+app.include_router(formulas.router)   # /formulas
+app.include_router(gamelines.router)  # /gamelines
+app.include_router(stats.router)      # /stats
 
-# Gamelines Routes
+# Direct endpoints (for backward compatibility)
 @app.get("/{sport}/gamelines")
-async def get_gamelines(
+async def get_gamelines_direct(
     sport: str,
-    source: Optional[str] = Query(None, description="Sportsbook source"),
-    force_refresh: bool = Query(False, description="Force refresh from API")
+    source: Optional[str] = Query(None),
+    force_refresh: bool = Query(False)
 ):
     """Get gamelines for a specific sport"""
     if sport not in SportsManager.SUPPORTED_SPORTS:
@@ -92,7 +92,7 @@ async def get_gamelines(
     return result
 
 @app.get("/{sport}/stats/{team}/{year}")
-async def get_team_stats(
+async def get_team_stats_direct(
     sport: str,
     team: str,
     year: str
@@ -118,7 +118,6 @@ async def get_supported_sports():
 
 @app.post("/admin/cleanup")
 async def trigger_cleanup(background_tasks: BackgroundTasks):
-    """Trigger manual cleanup of gamelines (admin only)"""
     background_tasks.add_task(cleanup_gamelines)
     return {
         'message': 'Cleanup triggered',
