@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 import bcrypt
 import os
 from typing import Optional
-from jose import jwt, JWTError
+from jose import jwt, JWTError  # Use jose
 import datetime
 from core.database import get_db
 from sqlalchemy.orm import Session
@@ -93,7 +93,6 @@ async def register_user(
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already taken")
     
-    password_hash = hash_password(user_data.password)
     try:
         user = user_manager.create_user(
             username=user_data.username,

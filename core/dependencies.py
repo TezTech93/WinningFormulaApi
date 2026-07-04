@@ -3,8 +3,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
-from jose import JWTError
-import jwt
+from jose import JWTError, jwt  # Use jose instead of direct jwt
 import os
 
 from core.database import get_db
