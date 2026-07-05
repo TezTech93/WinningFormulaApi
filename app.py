@@ -31,54 +31,67 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add CORS middleware
+# ============ CORS Middleware ============
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8081",
+        "http://localhost:19006",
+        "http://localhost:3000",
+        "https://winningformulaapi.onrender.com",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Initialize database on startup
+# ============ Database Initialization ============
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Initializing database...")
-    init_db()
+    logger.info("Initializing PostgreSQL database...")
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+        
+        if check_db_connection():
+            logger.info("PostgreSQL connection successful")
+        else:
+            logger.error("PostgreSQL connection failed")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
     
-    if check_db_connection():
-        logger.info("Database connection successful")
-    else:
-        logger.error("Database connection failed")
-    
+    # Start background cleanup thread
     def cleanup_loop():
         while True:
             try:
                 cleanup_gamelines()
             except Exception as e:
                 logger.error(f"Error in cleanup loop: {e}")
-            time.sleep(3600)
+            time.sleep(3600)  # Run every hour
     
     cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
     cleanup_thread.start()
     logger.info("Background cleanup thread started")
 
-# Import routers
-from routers import auth, users, formulas, gamelines, stats
+# ============ Import Routers ============
+from routers import auth, users, formulas, gamelines, stats, parlays, strategies
 
-# Include all routers
-app.include_router(auth.router)      # /auth/login, /auth/register
-app.include_router(users.router)      # /users/me, /users/me/password
-app.include_router(formulas.router)   # /formulas
-app.include_router(gamelines.router)  # /gamelines
-app.include_router(stats.router)      # /stats
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(formulas.router, prefix="/formulas", tags=["Formulas"])
+app.include_router(gamelines.router, prefix="/gamelines", tags=["Gamelines"])
+app.include_router(stats.router, prefix="/stats", tags=["Stats"])
+app.include_router(parlays.router, prefix="/parlays", tags=["Parlays"])
+app.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 
-# Direct endpoints (for backward compatibility)
+# ============ Direct Endpoints for Backward Compatibility ============
 @app.get("/{sport}/gamelines")
 async def get_gamelines_direct(
     sport: str,
-    source: Optional[str] = Query(None),
-    force_refresh: bool = Query(False)
+    source: Optional[str] = Query(None, description="Sportsbook source"),
+    force_refresh: bool = Query(False, description="Force refresh from API")
 ):
     """Get gamelines for a specific sport"""
     if sport not in SportsManager.SUPPORTED_SPORTS:
@@ -113,11 +126,13 @@ async def get_supported_sports():
     """Get list of supported sports"""
     return {
         'sports': SportsManager.SUPPORTED_SPORTS,
-        'count': len(SportsManager.SUPPORTED_SPORTS)
+        'count': len(SportsManager.SUPPORTED_SPORTS),
+        'info': {sport: SportsManager.get_sport_info(sport) for sport in SportsManager.SUPPORTED_SPORTS}
     }
 
 @app.post("/admin/cleanup")
 async def trigger_cleanup(background_tasks: BackgroundTasks):
+    """Trigger manual cleanup of gamelines"""
     background_tasks.add_task(cleanup_gamelines)
     return {
         'message': 'Cleanup triggered',
@@ -130,6 +145,7 @@ async def read_root():
         "message": "Winners Formula API is running!",
         "version": "2.0.0",
         "documentation": "/docs",
+        "database": "PostgreSQL",
         "supported_sports": SportsManager.SUPPORTED_SPORTS
     }
 
@@ -139,6 +155,7 @@ async def health_check():
     return {
         "status": "healthy" if db_status else "degraded",
         "database": "connected" if db_status else "disconnected",
+        "database_type": "PostgreSQL",
         "sports": SportsManager.SUPPORTED_SPORTS
     }
 

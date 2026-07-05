@@ -2,6 +2,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+
 from core.database import Base
 
 class Gameline(Base):
@@ -11,8 +12,8 @@ class Gameline(Base):
     sport = Column(String(10), nullable=False, index=True)
     source = Column(String(50), nullable=False)
     game_id = Column(String(50), nullable=False, index=True)
-    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
-    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    home_team = Column(String(100), nullable=False)
+    away_team = Column(String(100), nullable=False)
     home_abbr = Column(String(10), nullable=False)
     away_abbr = Column(String(10), nullable=False)
     home_ml = Column(Integer, nullable=True)
@@ -31,10 +32,6 @@ class Gameline(Base):
     away_score = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    home_team = relationship("Team", foreign_keys=[home_team_id])
-    away_team = relationship("Team", foreign_keys=[away_team_id])
     
     # Indexes
     __table_args__ = (
