@@ -10,8 +10,8 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Get database URL from settings or environment
-DATABASE_URL = os.getenv("DATABASE_URL", settings.DATABASE_URL)
+# Get database URL from settings
+DATABASE_URL = settings.DATABASE_URL
 
 # Create engine with PostgreSQL
 engine = create_engine(

@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
-    # Database - Use PostgreSQL on Render
+    # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
         "postgresql://winning_formula_db_user:4uchZZZiRrCv8e4FL2ykAc8Rmu1J0pBQ@dpg-d94s4afaqgkc73eami1g-a/winning_formula_db"
