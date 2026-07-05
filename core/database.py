@@ -4,13 +4,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 import logging
-from .config import settings
+import os
+
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Get database URL from settings or environment
+DATABASE_URL = os.getenv("DATABASE_URL", settings.DATABASE_URL)
+
 # Create engine with PostgreSQL
 engine = create_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,
@@ -30,8 +35,22 @@ def get_db() -> Generator[Session, None, None]:
 def init_db():
     """Initialize database tables"""
     try:
+        # Import all models to ensure they're registered
+        import models
         Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
+        logger.info("Database tables created successfully in PostgreSQL")
+        
+        # Check if users table has data
+        db = SessionLocal()
+        try:
+            from models.user import User
+            user_count = db.query(User).count()
+            logger.info(f"Users in database: {user_count}")
+        except Exception as e:
+            logger.warning(f"Could not check users: {e}")
+        finally:
+            db.close()
+            
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
         raise
@@ -42,8 +61,8 @@ def check_db_connection():
         db = SessionLocal()
         db.execute(text("SELECT 1"))
         db.close()
-        logger.info("Database connection successful")
+        logger.info("PostgreSQL connection successful")
         return True
     except Exception as e:
-        logger.error(f"Database connection failed: {e}")
+        logger.error(f"PostgreSQL connection failed: {e}")
         return False
