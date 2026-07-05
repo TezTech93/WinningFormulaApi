@@ -12,7 +12,7 @@ import datetime
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from manager import UserManager, UserTier
+from Users import UserManager, UserTier
 
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "khi-my-guy-always365")
