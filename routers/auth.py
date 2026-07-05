@@ -152,3 +152,7 @@ async def get_current_user_info(
         "created_at": current_user.created_at.isoformat(),
         "tier": current_user.tier.value
     }
+
+@router.get("/ping")
+async def ping():
+    return {"message": "Auth router is mounted!", "status": "ok"}
