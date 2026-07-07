@@ -26,13 +26,12 @@ class Parlay(Base):
     potential_profit = Column(Float, nullable=False, default=0.0)
     status = Column(Enum(ParlayStatus), default=ParlayStatus.PENDING)
     selections_count = Column(Integer, nullable=False, default=0)
-    metadata = Column(JSON, nullable=True)  # Store additional data like locks, etc.
+    metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
     user = relationship("User", back_populates="parlays")
-    selections = relationship("ParlaySelection", back_populates="parlay", cascade="all, delete-orphan")
+    selections = relationship("ParlaySelection", back_populates="parlay", cascade="all, delete-orphan", lazy="select")
 
 class ParlaySelection(Base):
     __tablename__ = "parlay_selections"
@@ -40,14 +39,13 @@ class ParlaySelection(Base):
     id = Column(Integer, primary_key=True, index=True)
     parlay_id = Column(Integer, ForeignKey("parlays.id", ondelete="CASCADE"), nullable=False)
     game_id = Column(String(50), nullable=False)
-    selection_type = Column(String(20), nullable=False)  # spread, moneyline, overunder
-    selection_value = Column(String(50), nullable=False)  # The actual selection (e.g., "DET -3.5")
+    selection_type = Column(String(20), nullable=False)
+    selection_value = Column(String(50), nullable=False)
     odds = Column(Float, nullable=False)
-    is_locked = Column(Integer, default=0)  # 0 = not locked, 1 = win lock, 2 = loss lock
-    result = Column(String(10), nullable=True)  # W, L, P (push)
+    is_locked = Column(Integer, default=0)
+    result = Column(String(10), nullable=True)
     order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
     parlay = relationship("Parlay", back_populates="selections")

@@ -22,8 +22,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
-    formulas = relationship("UserFormula", back_populates="user", cascade="all, delete-orphan")
-    strategies = relationship("UserStrategy", back_populates="user", cascade="all, delete-orphan")
-    predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
-    parlays = relationship("Parlay", back_populates="user", cascade="all, delete-orphan")
+    # Relationships - using string references to avoid circular imports
+    formulas = relationship("UserFormula", back_populates="user", cascade="all, delete-orphan", lazy="select")
+    strategies = relationship("UserStrategy", back_populates="user", cascade="all, delete-orphan", lazy="select")
+    predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan", lazy="select")
+    parlays = relationship("Parlay", back_populates="user", cascade="all, delete-orphan", lazy="select")

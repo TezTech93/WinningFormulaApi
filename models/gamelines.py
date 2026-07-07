@@ -1,5 +1,5 @@
 # models/gameline.py
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Index,Enum
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -33,7 +33,8 @@ class Gameline(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Indexes
+    # No relationships to avoid circular imports
+    
     __table_args__ = (
         Index('idx_gamelines_sport_date', 'sport', 'game_date'),
         Index('idx_gamelines_completed', 'is_completed'),
