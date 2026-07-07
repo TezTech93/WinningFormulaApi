@@ -1,7 +1,8 @@
 # models/team.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON,Enum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+
 from core.database import Base
 
 class Team(Base):
@@ -19,9 +20,7 @@ class Team(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
-    stats = relationship("TeamStats", back_populates="team", cascade="all, delete-orphan")
-    gamelines = relationship("Gameline", back_populates="team")
+    stats = relationship("TeamStats", back_populates="team", cascade="all, delete-orphan", lazy="select")
 
 class TeamStats(Base):
     __tablename__ = "team_stats"
@@ -30,9 +29,8 @@ class TeamStats(Base):
     team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
     year = Column(Integer, nullable=False)
     season_type = Column(String(20), default="regular")
-    stats = Column(JSON, nullable=False)  # Store all stats as JSON
+    stats = Column(JSON, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
     team = relationship("Team", back_populates="stats")

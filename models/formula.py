@@ -1,5 +1,5 @@
 # models/formula.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Enum, Float,Enum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum

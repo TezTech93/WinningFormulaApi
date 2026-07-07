@@ -1,5 +1,5 @@
 # models/strategy.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float,Enum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
@@ -29,7 +29,7 @@ class UserStrategy(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    user = relationship("User", backref="strategies")
+    user = relationship("User", back_populates="strategies")
 
 class StrategyTip(Base):
     __tablename__ = "strategy_tips"
@@ -38,7 +38,7 @@ class StrategyTip(Base):
     category = Column(String(50), nullable=False)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
-    difficulty = Column(String(20), default="Beginner")  # Beginner, Intermediate, Advanced
+    difficulty = Column(String(20), default="Beginner")
     icon = Column(String(10), nullable=True)
     order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
