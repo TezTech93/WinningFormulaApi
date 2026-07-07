@@ -83,7 +83,7 @@ app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(formulas.router, prefix="/formulas", tags=["Formulas"])
 app.include_router(gamelines.router, prefix="/gamelines", tags=["Gamelines"])
 app.include_router(stats.router, prefix="/stats", tags=["Stats"])
-app.include_router(parlays.router, prefix="/parlays", tags=["Parlays"])
+app.include_router(parlay.router, prefix="/parlays", tags=["Parlays"])
 app.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 
 
