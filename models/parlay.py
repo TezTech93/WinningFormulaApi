@@ -26,7 +26,7 @@ class Parlay(Base):
     potential_profit = Column(Float, nullable=False, default=0.0)
     status = Column(Enum(ParlayStatus), default=ParlayStatus.PENDING)
     selections_count = Column(Integer, nullable=False, default=0)
-    metadata = Column(JSON, nullable=True)
+    extra_data = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
