@@ -76,7 +76,7 @@ async def startup_event():
     logger.info("Background cleanup thread started")
 
 # ============ Import Routers ============
-from routers import auth, users, formulas, gamelines, stats, parlays, strategies
+from routers import auth, users, formulas, gamelines, stats, parlay, strategies
 
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
@@ -85,6 +85,7 @@ app.include_router(gamelines.router, prefix="/gamelines", tags=["Gamelines"])
 app.include_router(stats.router, prefix="/stats", tags=["Stats"])
 app.include_router(parlays.router, prefix="/parlays", tags=["Parlays"])
 app.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
+
 
 # ============ Direct Endpoints for Backward Compatibility ============
 @app.get("/{sport}/gamelines")
