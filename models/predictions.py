@@ -1,5 +1,5 @@
 # models/prediction.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float,Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
