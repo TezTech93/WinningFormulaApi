@@ -1,5 +1,5 @@
 # models/gameline.py
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Index
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Index,Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
