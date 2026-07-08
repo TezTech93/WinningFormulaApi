@@ -13,15 +13,9 @@ class Gameline(Base):
     source = Column(String(50), nullable=False)
     game_id = Column(String(50), nullable=False, index=True)
     
-    # These match your actual database columns
+    # These columns exist in your database
     home_team_id = Column(Integer, nullable=True)
     away_team_id = Column(Integer, nullable=True)
-    
-    # Add the missing columns if they exist, or remove if they don't
-    home_team = Column(String(100), nullable=True)
-    away_team = Column(String(100), nullable=True)
-    home_abbr = Column(String(10), nullable=True)
-    away_abbr = Column(String(10), nullable=True)
     
     home_ml = Column(Integer, nullable=True)
     away_ml = Column(Integer, nullable=True)
@@ -39,6 +33,8 @@ class Gameline(Base):
     away_score = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # No relationships to avoid complexity
     
     __table_args__ = (
         Index('idx_gamelines_sport_date', 'sport', 'game_date'),
