@@ -4,7 +4,7 @@ from sqlalchemy import and_, or_
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
-from models.gamelines import Gameline
+from models.gameline import Gameline  # Changed from gamelines to gameline
 from models.team import Team
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,8 @@ class GamelineManager:
             game_id=data.get('game_id'),
             home_team_id=data.get('home_team_id'),
             away_team_id=data.get('away_team_id'),
+            home_team=data.get('home_team'),
+            away_team=data.get('away_team'),
             home_abbr=data.get('home_abbr'),
             away_abbr=data.get('away_abbr'),
             home_ml=data.get('home_ml'),
@@ -132,3 +134,14 @@ class GamelineManager:
             ),
             Gameline.is_completed == True
         ).order_by(Gameline.game_date.desc()).limit(num_games).all()
+    
+    def get_gamelines_by_team_and_date(self, team_id: int, date: datetime) -> List[Gameline]:
+        """Get gamelines for a specific team on a specific date"""
+        return self.db.query(Gameline).filter(
+            or_(
+                Gameline.home_team_id == team_id,
+                Gameline.away_team_id == team_id
+            ),
+            Gameline.game_date >= date,
+            Gameline.game_date < date + timedelta(days=1)
+        ).order_by(Gameline.game_date).all()
