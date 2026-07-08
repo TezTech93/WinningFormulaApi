@@ -135,10 +135,6 @@ async def register_user(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
 
-@router.get("/login")
-async def login_seek():
-    return {'message':'Login route working!'}
-
 @router.post("/login", response_model=TokenResponse)
 async def login_user(
     login_data: UserLogin,
@@ -151,15 +147,10 @@ async def login_user(
     
     user_manager = UserManager(db)
     
-    # First check if user exists
-    user = user_manager.get_user_by_email(login_data.email)
+    # Authenticate user
+    user = user_manager.authenticate_user(login_data.email, login_data.password)
     if not user:
-        print(f"❌ User not found: {login_data.email}")
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    # Verify password
-    if not verify_password(login_data.password, user.password_hash):
-        print(f"❌ Invalid password for: {login_data.email}")
+        print(f"❌ Login failed: {login_data.email}")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     print(f"✅ Login successful: {user.id} - {user.email}")
@@ -192,6 +183,10 @@ async def get_current_user_info(
         "tier": current_user.tier.value
     }
 
+@router.get("/login")
+async def login_user_show():
+    return {"message": "Login is working!"}
+    
 @router.get("/ping")
 async def ping():
     """
