@@ -13,11 +13,11 @@ class Gameline(Base):
     source = Column(String(50), nullable=False)
     game_id = Column(String(50), nullable=False, index=True)
     
-    # Use home_team_id and away_team_id to match your DB schema
-    home_team_id = Column(Integer, nullable=True)  # Foreign key to teams table
-    away_team_id = Column(Integer, nullable=True)  # Foreign key to teams table
+    # These match your actual database columns
+    home_team_id = Column(Integer, nullable=True)
+    away_team_id = Column(Integer, nullable=True)
     
-    # Keep these for backward compatibility
+    # Add the missing columns if they exist, or remove if they don't
     home_team = Column(String(100), nullable=True)
     away_team = Column(String(100), nullable=True)
     home_abbr = Column(String(10), nullable=True)
