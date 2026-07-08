@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
-from jose import JWTError, jwt  # Use jose instead of direct jwt
+from jose import JWTError, jwt
 import os
 
 from core.database import get_db
@@ -12,12 +12,10 @@ from managers.user_manager import UserManager
 from models.user import User
 
 security = HTTPBearer()
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "khi-my-guy-always365")
-ALGORITHM = "HS256"
 
 def decode_access_token(token: str):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     except JWTError:
         raise HTTPException(
@@ -30,9 +28,6 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
-    """
-    Get the current authenticated user from JWT token
-    """
     token = credentials.credentials
     
     try:
@@ -66,18 +61,12 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    """
-    Get the current active user
-    """
     return current_user
 
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
-    """
-    Get the current user if authenticated, otherwise return None
-    """
     if not credentials:
         return None
     
@@ -95,9 +84,6 @@ async def get_current_user_optional(
     return user
 
 def get_current_user_with_tier(required_tier: str = None):
-    """
-    Dependency factory for checking user tier
-    """
     async def _get_current_user_with_tier(
         current_user: User = Depends(get_current_user)
     ) -> User:
@@ -121,7 +107,6 @@ def get_current_user_with_tier(required_tier: str = None):
     
     return _get_current_user_with_tier
 
-# Convenience dependencies for different tier levels
 get_free_user = get_current_user_with_tier("FREE")
 get_paid_user = get_current_user_with_tier("PAID")
 get_plus_user = get_current_user_with_tier("PLUS")
