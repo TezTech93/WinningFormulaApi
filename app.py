@@ -96,6 +96,129 @@ async def health_check():
         "database_type": "PostgreSQL"
     }
 
+# app.py - Add this at the bottom, before the if __name__ == "__main__" block
+
+# ============ Direct Gamelines Endpoint ============
+@app.get("/nfl/gamelines")
+async def get_nfl_gamelines_direct(
+    source: Optional[str] = Query(None, description="Sportsbook source"),
+    force_refresh: bool = Query(False, description="Force refresh from API")
+):
+    """Get NFL gamelines directly"""
+    from core.database import get_db as get_db_session
+    from managers.gameline_manager import GamelineManager
+    
+    db = next(get_db_session())
+    try:
+        gameline_manager = GamelineManager(db)
+        gamelines = gameline_manager.get_gamelines_by_sport("nfl", source)
+        
+        games = []
+        for g in gamelines:
+            games.append({
+                'id': g.id,
+                'sport': g.sport,
+                'source': g.source,
+                'game_id': g.game_id,
+                'home_team_id': g.home_team_id,
+                'away_team_id': g.away_team_id,
+                'home_team': g.home_team if hasattr(g, 'home_team') else None,
+                'away_team': g.away_team if hasattr(g, 'away_team') else None,
+                'home_abbr': g.home_abbr if hasattr(g, 'home_abbr') else None,
+                'away_abbr': g.away_abbr if hasattr(g, 'away_abbr') else None,
+                'home_ml': g.home_ml,
+                'away_ml': g.away_ml,
+                'home_spread': g.home_spread,
+                'away_spread': g.away_spread,
+                'home_spread_odds': g.home_spread_odds,
+                'away_spread_odds': g.away_spread_odds,
+                'total': g.total,
+                'over_odds': g.over_odds,
+                'under_odds': g.under_odds,
+                'game_day': g.game_date.strftime('%Y-%m-%d') if g.game_date else None,
+                'start_time': g.start_time,
+                'is_completed': g.is_completed,
+                'home_score': g.home_score,
+                'away_score': g.away_score,
+            })
+        
+        return {
+            'sport': 'nfl',
+            'source': source or 'all',
+            'games': games,
+            'count': len(games)
+        }
+    except Exception as e:
+        logger.error(f"Error getting NFL gamelines: {e}")
+        return {
+            'sport': 'nfl',
+            'source': source or 'all',
+            'games': [],
+            'count': 0,
+            'error': str(e)
+        }
+    finally:
+        db.close()
+
+# Generic endpoint for all sports
+@app.get("/{sport}/gamelines")
+async def get_sport_gamelines_direct(
+    sport: str,
+    source: Optional[str] = Query(None, description="Sportsbook source"),
+    force_refresh: bool = Query(False, description="Force refresh from API")
+):
+    """Get gamelines for any sport directly"""
+    from core.database import get_db as get_db_session
+    from managers.gameline_manager import GamelineManager
+    
+    db = next(get_db_session())
+    try:
+        gameline_manager = GamelineManager(db)
+        gamelines = gameline_manager.get_gamelines_by_sport(sport, source)
+        
+        games = []
+        for g in gamelines:
+            games.append({
+                'id': g.id,
+                'sport': g.sport,
+                'source': g.source,
+                'game_id': g.game_id,
+                'home_team_id': g.home_team_id,
+                'away_team_id': g.away_team_id,
+                'home_ml': g.home_ml,
+                'away_ml': g.away_ml,
+                'home_spread': g.home_spread,
+                'away_spread': g.away_spread,
+                'home_spread_odds': g.home_spread_odds,
+                'away_spread_odds': g.away_spread_odds,
+                'total': g.total,
+                'over_odds': g.over_odds,
+                'under_odds': g.under_odds,
+                'game_day': g.game_date.strftime('%Y-%m-%d') if g.game_date else None,
+                'start_time': g.start_time,
+                'is_completed': g.is_completed,
+                'home_score': g.home_score,
+                'away_score': g.away_score,
+            })
+        
+        return {
+            'sport': sport,
+            'source': source or 'all',
+            'games': games,
+            'count': len(games)
+        }
+    except Exception as e:
+        logger.error(f"Error getting {sport} gamelines: {e}")
+        return {
+            'sport': sport,
+            'source': source or 'all',
+            'games': [],
+            'count': 0,
+            'error': str(e)
+        }
+    finally:
+        db.close()
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
