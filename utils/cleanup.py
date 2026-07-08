@@ -11,33 +11,35 @@ def cleanup_gamelines():
     """Background task to clean up old gamelines"""
     db = SessionLocal()
     try:
-        manager = GamelineManager(db)
+        # Use raw SQL to avoid model issues
+        from sqlalchemy import text
+        now = datetime.now()
         
         # Mark completed games
-        marked = manager.mark_completed_games()
+        db.execute(
+            text("UPDATE gamelines SET is_completed = true WHERE is_completed = false AND game_date < :now"),
+            {"now": now}
+        )
+        db.commit()
         
-        # Delete old completed games (older than 7 days)
-        deleted = manager.delete_old_gamelines(days=7)
+        # Delete old completed games
+        cutoff = now - timedelta(days=7)
+        db.execute(
+            text("DELETE FROM gamelines WHERE is_completed = true AND game_date < :cutoff"),
+            {"cutoff": cutoff}
+        )
+        db.commit()
         
-        logger.info(f"Cleanup completed: marked {marked} games as completed, deleted {deleted} old games")
+        logger.info("Cleanup completed successfully")
         
         return {
-            'marked_completed': marked,
-            'deleted_old': deleted,
+            'marked_completed': True,
+            'deleted_old': True,
             'timestamp': datetime.now().isoformat()
         }
     except Exception as e:
         logger.error(f"Error in cleanup task: {e}")
+        db.rollback()
         return None
     finally:
         db.close()
-
-def run_cleanup_scheduled():
-    """Run cleanup as a scheduled task"""
-    # This can be called from a scheduler or cron job
-    return cleanup_gamelines()
-
-if __name__ == "__main__":
-    # Run directly for testing
-    result = run_cleanup_scheduled()
-    print(result)
