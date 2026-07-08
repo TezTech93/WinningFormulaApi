@@ -1,6 +1,6 @@
 # managers/user_manager.py
 from sqlalchemy.orm import Session
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from core.security import hash_password, verify_password
 from models.user import User, UserTier
 from core.config import settings
@@ -43,7 +43,7 @@ class UserManager:
         user = self.get_user_by_id(user_id)
         if not user:
             return None
-        user.tier = tier
+        user.tier = UserTier(tier)
         self.db.commit()
         self.db.refresh(user)
         return user

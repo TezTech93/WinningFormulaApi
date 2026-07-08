@@ -1,18 +1,18 @@
 # routers/auth.py
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 import bcrypt
 import os
 from typing import Optional
 from jose import jwt, JWTError
 import datetime
+from sqlalchemy.orm import Session
 
-# Import the original manager (NOT the SQLAlchemy version)
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from Users.manager import UserManager, UserTier
+# Import the new SQLAlchemy manager
+from core.database import get_db
+from managers.user_manager import UserManager
+from models.user import User, UserTier
 
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "khi-my-guy-always365")
@@ -25,7 +25,7 @@ security = HTTPBearer()
 # Pydantic models
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    email: str  # Changed from EmailStr to avoid validation issues
+    email: str
     password: str = Field(..., min_length=6)
 
 class UserLogin(BaseModel):
@@ -62,7 +62,8 @@ def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
 ):
     token = credentials.credentials
     try:
@@ -74,136 +75,126 @@ async def get_current_user(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     
-    # Use the original manager with super users
-    user_manager = UserManager()
+    user_manager = UserManager(db)
     user = user_manager.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-async def register_user(user_data: UserCreate):
+async def register_user(
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+):
     """
-    Register a new user using the original manager
+    Register a new user
     """
-    print(f"Registration attempt: {user_data.email}")
+    print(f"📝 Registration attempt: {user_data.email}")
     
-    # Use the original manager
-    user_manager = UserManager()
-    
-    # Check if super user (prevent registration of super user emails)
-    if user_manager.is_super_user_email(user_data.email):
-        raise HTTPException(status_code=400, detail="Email reserved for super user")
+    user_manager = UserManager(db)
     
     # Check if email already exists
     existing = user_manager.get_user_by_email(user_data.email)
     if existing:
+        print(f"❌ Email already registered: {user_data.email}")
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Check if username already exists
     existing_username = user_manager.get_user_by_username(user_data.username)
     if existing_username:
+        print(f"❌ Username already taken: {user_data.username}")
         raise HTTPException(status_code=400, detail="Username already taken")
     
     try:
-        # Hash password
-        password_hash = hash_password(user_data.password)
-        
         # Create user
-        user_id = user_manager.create_user(
+        user = user_manager.create_user(
             username=user_data.username,
             email=user_data.email,
-            password_hash=password_hash
+            password=user_data.password
         )
         
-        # Get the created user
-        user = user_manager.get_user_by_id(user_id)
+        print(f"✅ User created: {user.id} - {user.email}")
         
         # Create access token
-        access_token = create_access_token(data={"sub": str(user["id"])})
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return {
             "access_token": access_token,
             "token_type": "bearer",
             "user": {
-                "id": user["id"],
-                "username": user["username"],
-                "email": user["email"],
-                "created_at": user["created_at"],
-                "tier": user["tier"]
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "created_at": user.created_at.isoformat(),
+                "tier": user.tier.value
             }
         }
     except Exception as e:
-        print(f"Registration error: {str(e)}")
+        print(f"❌ Registration error: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
 
+@router.get("/login")
+async def login_seek():
+    return {'message':'Login route working!'}
+
 @router.post("/login", response_model=TokenResponse)
-async def login_user(login_data: UserLogin):
+async def login_user(
+    login_data: UserLogin,
+    db: Session = Depends(get_db)
+):
     """
-    Login user using the original manager
+    Login user
     """
-    print(f"Login attempt: {login_data.email}")
+    print(f"🔐 Login attempt: {login_data.email}")
     
-    # Use the original manager
-    user_manager = UserManager()
+    user_manager = UserManager(db)
     
-    # First check super users (plain text)
-    super_user = user_manager.get_super_user_by_email(login_data.email)
-    if super_user and super_user['password_hash'] == login_data.password:
-        print("Super user authenticated")
-        access_token = create_access_token(data={"sub": str(super_user["id"])})
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": {
-                "id": super_user["id"],
-                "username": super_user["username"],
-                "email": super_user["email"],
-                "created_at": super_user["created_at"],
-                "tier": super_user["tier"]
-            }
-        }
-    
-    # Then check normal users (bcrypt)
+    # First check if user exists
     user = user_manager.get_user_by_email(login_data.email)
-    if user:
-        # Get the password hash from database
-        conn = user_manager.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT password_hash FROM users WHERE id = ?", (user["id"],))
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result and verify_password(login_data.password, result[0]):
-            print("Normal user authenticated")
-            access_token = create_access_token(data={"sub": str(user["id"])})
-            return {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "user": {
-                    "id": user["id"],
-                    "username": user["username"],
-                    "email": user["email"],
-                    "created_at": user["created_at"],
-                    "tier": user["tier"]
-                }
-            }
+    if not user:
+        print(f"❌ User not found: {login_data.email}")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    print("Authentication failed")
-    raise HTTPException(status_code=401, detail="Invalid email or password")
+    # Verify password
+    if not verify_password(login_data.password, user.password_hash):
+        print(f"❌ Invalid password for: {login_data.email}")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    print(f"✅ Login successful: {user.id} - {user.email}")
+    
+    access_token = create_access_token(data={"sub": str(user.id)})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "created_at": user.created_at.isoformat(),
+            "tier": user.tier.value
+        }
+    }
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user = Depends(get_current_user)):
+async def get_current_user_info(
+    current_user = Depends(get_current_user)
+):
+    """
+    Get current user information
+    """
     return {
-        "id": current_user["id"],
-        "username": current_user["username"],
-        "email": current_user["email"],
-        "created_at": current_user["created_at"],
-        "tier": current_user["tier"]
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "created_at": current_user.created_at.isoformat(),
+        "tier": current_user.tier.value
     }
 
 @router.get("/ping")
 async def ping():
-    return {"message": "Auth router is mounted!", "status": "ok", "using": "original_manager"}
+    """
+    Test endpoint to verify auth router is mounted
+    """
+    return {"message": "Auth router is mounted!", "status": "ok"}
