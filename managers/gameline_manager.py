@@ -4,7 +4,7 @@ from sqlalchemy import and_, or_
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
-from models.gameline import Gameline  # Changed from gamelines to gameline
+from models.gamelines import Gameline  
 from models.team import Team
 
 logger = logging.getLogger(__name__)
