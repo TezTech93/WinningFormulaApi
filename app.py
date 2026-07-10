@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import logging
 from typing import Optional, List, Dict, Any
 
-from sports.manager import sports_manager
+from Sports.manager import sports_manager
 from core.database import get_db, init_db, check_db_connection
 
 # Set up logging
