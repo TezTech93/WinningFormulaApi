@@ -7,7 +7,7 @@ from datetime import datetime
 from core.database import Base
 
 class Gameline(Base):
-    __tablename__ = "gamelinesDB"
+    __tablename__ = "gamelines"
     
     id = Column(Integer, primary_key=True, index=True)
     sport = Column(String(10), nullable=False, index=True)
