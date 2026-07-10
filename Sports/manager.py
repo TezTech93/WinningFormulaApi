@@ -1,177 +1,313 @@
-# Sports/manager.py
-from typing import Dict, Any, Optional, List
+# sports/manager.py
 import logging
-from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+from sqlalchemy.orm import Session
+from datetime import datetime
+import json
 
-from core.config import settings
+from core.database import get_db
+from models.gamelines import Gameline
+from models.season_phase import SeasonPhase
+from sports.base_scraper import BaseSportScraper
+from sports.nfl.scraper import NFLScraper
+from sports.nba.scraper import NBAScraper
+from sports.mlb.scraper import MLBScraper
+from sports.nhl.scraper import NHLScraper
+from sports.ncaaf.scraper import NCAAFScraper
+from sports.ncaab.scraper import NCAABScraper
 
 logger = logging.getLogger(__name__)
 
-# Sport instances cache
-_sport_instances = {}
-
-def get_sport_instance(sport: str):
-    """Get or create a sport instance"""
-    sport = sport.lower()
-    
-    if sport in _sport_instances:
-        return _sport_instances[sport]
-    
-    # Lazy import to avoid circular dependencies - Using 'Sports' folder
-    if sport == 'nfl':
-        from Sports.nfl.api import NFLSport
-        sport_class = NFLSport
-    elif sport == 'nba':
-        from Sports.nba.api import NBASport
-        sport_class = NBASport
-    elif sport == 'mlb':
-        from Sports.mlb.api import MLBSport
-        sport_class = MLBSport
-    elif sport == 'nhl':
-        from Sports.nhl.api import NHLSport
-        sport_class = NHLSport
-    elif sport == 'ncaaf':
-        from Sports.ncaaf.api import NCAAFSport
-        sport_class = NCAAFSport
-    elif sport == 'ncaab':
-        from Sports.ncaab.api import NCAABSport
-        sport_class = NCAABSport
-    else:
-        raise ValueError(f"Unsupported sport: {sport}")
-    
-    sport_map = {
-        'nfl': settings.NFL_API_URL,
-        'nba': settings.NBA_API_URL,
-        'mlb': settings.MLB_API_URL,
-        'nhl': settings.NHL_API_URL,
-        'ncaaf': settings.NCAAF_API_URL,
-        'ncaab': settings.NCAAB_API_URL,
-    }
-    
-    api_url = sport_map.get(sport)
-    if not api_url:
-        raise ValueError(f"No API URL configured for sport: {sport}")
-    
-    instance = sport_class(api_url)
-    _sport_instances[sport] = instance
-    return instance
-
 class SportsManager:
-    """Unified manager for all sports"""
+    """Unified manager for all sports with PostgreSQL support"""
     
     SUPPORTED_SPORTS = ['nfl', 'nba', 'mlb', 'nhl', 'ncaaf', 'ncaab']
     
-    @classmethod
-    async def get_gamelines(cls, sport: str, source: str = None, force_refresh: bool = False) -> Dict[str, Any]:
-        """Get gamelines for a specific sport"""
+    def __init__(self):
+        self.scrapers = {}
+        self._init_scrapers()
+    
+    def _init_scrapers(self):
+        """Initialize all sport scrapers"""
+        self.scrapers = {
+            'nfl': NFLScraper(),
+            'nba': NBAScraper(),
+            'mlb': MLBScraper(),
+            'nhl': NHLScraper(),
+            'ncaaf': NCAAFScraper(),
+            'ncaab': NCAABScraper()
+        }
+        logger.info(f"Initialized scrapers for {list(self.scrapers.keys())}")
+    
+    def get_scraper(self, sport: str) -> Optional[BaseSportScraper]:
+        """Get scraper for a specific sport"""
+        return self.scrapers.get(sport)
+    
+    def _get_cached_gamelines(self, db: Session, sport: str) -> List[Dict]:
+        """Get cached gamelines from PostgreSQL database"""
         try:
-            sport_instance = get_sport_instance(sport)
+            gamelines = db.query(Gameline).filter(
+                Gameline.sport == sport,
+                Gameline.is_completed == False
+            ).order_by(Gameline.game_day).all()
             
-            # Check cache first (unless force refresh)
-            if not force_refresh:
-                cached = sport_instance.get_cached_gamelines(source)
-                if cached:
-                    # Check if cache is fresh
-                    for game in cached:
-                        updated = game.get('updated_at', '')
-                        if updated:
-                            try:
-                                updated_dt = datetime.fromisoformat(updated.replace('Z', '+00:00'))
-                                if datetime.now() - updated_dt < timedelta(minutes=settings.CACHE_EXPIRY_MINUTES):
-                                    return {
-                                        'sport': sport,
-                                        'source': source or 'cached',
-                                        'games': cached,
-                                        'cached': True,
-                                        'count': len(cached)
-                                    }
-                            except ValueError:
-                                continue
-                    # Cache is stale, continue to fetch
+            return [g.to_dict() for g in gamelines]
+        except Exception as e:
+            logger.error(f"Error reading cached gamelines: {e}")
+            return []
+    
+    def _store_gamelines(self, db: Session, sport: str, games: List[Dict], source: str = 'web_scraper'):
+        """Store gamelines in PostgreSQL database"""
+        try:
+            for game in games:
+                # Check if game already exists
+                existing = db.query(Gameline).filter(
+                    Gameline.game_id == game.get('game_id')
+                ).first()
+                
+                if existing:
+                    # Update existing
+                    for key, value in game.items():
+                        if hasattr(existing, key) and value is not None:
+                            setattr(existing, key, value)
+                    existing.updated_at = datetime.now()
+                else:
+                    # Create new
+                    new_gameline = Gameline(
+                        sport=sport,
+                        source=source,
+                        game_id=game.get('game_id', f"{sport}_{int(datetime.now().timestamp())}"),
+                        game_day=datetime.strptime(game.get('game_day'), '%Y-%m-%d').date(),
+                        start_time=game.get('start_time'),
+                        home_team=game.get('home'),
+                        away_team=game.get('away'),
+                        home_abbr=game.get('home_abbr'),
+                        away_abbr=game.get('away_abbr'),
+                        home_ml=game.get('home_ml'),
+                        away_ml=game.get('away_ml'),
+                        home_spread=game.get('home_spread'),
+                        away_spread=game.get('away_spread'),
+                        home_spread_odds=game.get('home_spread_odds'),
+                        away_spread_odds=game.get('away_spread_odds'),
+                        over_under=game.get('over_under'),
+                        over_odds=game.get('over_odds'),
+                        under_odds=game.get('under_odds'),
+                        is_completed=game.get('is_completed', False),
+                        is_manual=False
+                    )
+                    db.add(new_gameline)
             
-            # Fetch fresh data
-            games = await sport_instance.fetch_gamelines(source)
-            if games:
-                return {
-                    'sport': sport,
-                    'source': source or 'espn_bets',
-                    'games': games,
-                    'cached': False,
-                    'count': len(games)
-                }
+            db.commit()
+            logger.info(f"Stored {len(games)} games for {sport}")
+        except Exception as e:
+            logger.error(f"Error storing gamelines: {e}")
+            db.rollback()
+    
+    def _store_single_gameline(self, db: Session, sport: str, game: Dict) -> bool:
+        """Store a single gameline in PostgreSQL database"""
+        try:
+            # Check if game already exists
+            game_id = game.get('game_id', f"{sport}_manual_{int(datetime.now().timestamp())}")
+            existing = db.query(Gameline).filter(
+                Gameline.game_id == game_id
+            ).first()
             
-            # If fetch fails, return cached data even if stale
-            cached = sport_instance.get_cached_gamelines(source)
+            if existing:
+                # Update existing
+                for key, value in game.items():
+                    if hasattr(existing, key) and value is not None:
+                        setattr(existing, key, value)
+                existing.updated_at = datetime.now()
+                existing.is_manual = True
+            else:
+                # Create new
+                new_gameline = Gameline(
+                    sport=sport,
+                    source='manual',
+                    game_id=game_id,
+                    game_day=datetime.strptime(game.get('game_day'), '%Y-%m-%d').date(),
+                    start_time=game.get('start_time'),
+                    home_team=game.get('home_team'),
+                    away_team=game.get('away_team'),
+                    home_abbr=game.get('home_abbr'),
+                    away_abbr=game.get('away_abbr'),
+                    home_ml=game.get('home_ml'),
+                    away_ml=game.get('away_ml'),
+                    home_spread=game.get('home_spread'),
+                    away_spread=game.get('away_spread'),
+                    home_spread_odds=game.get('home_spread_odds'),
+                    away_spread_odds=game.get('away_spread_odds'),
+                    over_under=game.get('over_under'),
+                    over_odds=game.get('over_odds'),
+                    under_odds=game.get('under_odds'),
+                    is_completed=game.get('is_completed', False),
+                    is_manual=True
+                )
+                db.add(new_gameline)
+            
+            db.commit()
+            logger.info(f"Manually stored gameline: {game.get('home_team')} vs {game.get('away_team')}")
+            return True
+        except Exception as e:
+            logger.error(f"Error storing manual gameline: {e}")
+            db.rollback()
+            return False
+    
+    def _store_season_phase(self, db: Session, sport: str, phase: Dict):
+        """Store season phase in PostgreSQL database"""
+        try:
+            existing = db.query(SeasonPhase).filter(
+                SeasonPhase.sport == sport
+            ).first()
+            
+            if existing:
+                existing.phase = phase.get('phase')
+                existing.season = phase.get('season')
+                existing.week = phase.get('week', 0)
+                existing.details = phase.get('details')
+                existing.updated_at = datetime.now()
+            else:
+                new_phase = SeasonPhase(
+                    sport=sport,
+                    phase=phase.get('phase'),
+                    season=phase.get('season'),
+                    week=phase.get('week', 0),
+                    details=phase.get('details')
+                )
+                db.add(new_phase)
+            
+            db.commit()
+        except Exception as e:
+            logger.error(f"Error storing season phase: {e}")
+            db.rollback()
+    
+    async def get_gamelines(self, sport: str, db: Session, force_refresh: bool = False) -> Dict[str, Any]:
+        """Get gamelines for a specific sport"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'games': [], 'count': 0}
+        
+        scraper = self.get_scraper(sport)
+        if not scraper:
+            return {'error': f'No scraper found for {sport}', 'games': [], 'count': 0}
+        
+        # Try to get cached data first
+        if not force_refresh:
+            cached = self._get_cached_gamelines(db, sport)
             if cached:
                 return {
                     'sport': sport,
-                    'source': source or 'cached',
+                    'source': 'cached',
                     'games': cached,
-                    'cached': True,
-                    'stale': True,
-                    'count': len(cached)
+                    'count': len(cached),
+                    'cached': True
                 }
-            
-            return {
-                'sport': sport,
-                'source': source or 'none',
-                'games': [],
-                'cached': False,
-                'count': 0,
-                'error': 'No data available'
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting {sport} gamelines: {e}")
-            return {
-                'sport': sport,
-                'source': source or 'none',
-                'games': [],
-                'cached': False,
-                'count': 0,
-                'error': str(e)
-            }
-    
-    @classmethod
-    async def get_team_stats(cls, sport: str, team: str, year: str) -> Dict[str, Any]:
-        """Get team stats for a specific sport"""
-        try:
-            sport_instance = get_sport_instance(sport)
-            stats = await sport_instance.get_team_stats(team, year)
-            return {
-                'sport': sport,
-                'team': team,
-                'year': year,
-                'stats': stats,
-                'count': len(stats) if isinstance(stats, list) else 0
-            }
-        except Exception as e:
-            logger.error(f"Error getting {sport} stats: {e}")
-            return {
-                'sport': sport,
-                'team': team,
-                'year': year,
-                'stats': [],
-                'count': 0,
-                'error': str(e)
-            }
-    
-    @classmethod
-    def get_supported_sports(cls) -> List[str]:
-        return cls.SUPPORTED_SPORTS
-    
-    @classmethod
-    def get_sport_info(cls, sport: str) -> Dict[str, Any]:
-        """Get information about a specific sport"""
-        if sport not in cls.SUPPORTED_SPORTS:
-            return {'error': f'Sport {sport} not supported'}
         
-        sport_map = {
-            'nfl': {'name': 'NFL', 'type': 'professional', 'logo': '🏈'},
-            'nba': {'name': 'NBA', 'type': 'professional', 'logo': '🏀'},
-            'mlb': {'name': 'MLB', 'type': 'professional', 'logo': '⚾'},
-            'nhl': {'name': 'NHL', 'type': 'professional', 'logo': '🏒'},
-            'ncaaf': {'name': 'NCAAF', 'type': 'college', 'logo': '🎯'},
-            'ncaab': {'name': 'NCAAB', 'type': 'college', 'logo': '🏀'},
+        # Fetch fresh data
+        games = scraper.get_gamelines()
+        if games:
+            self._store_gamelines(db, sport, games, source='web_scraper')
+        
+        return {
+            'sport': sport,
+            'source': 'live',
+            'games': games,
+            'count': len(games),
+            'cached': False
         }
-        return sport_map.get(sport, {'error': 'Sport not found'})
+    
+    async def get_team_stats(self, sport: str, team: str, year: str) -> Dict[str, Any]:
+        """Get team stats for a specific sport"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'stats': []}
+        
+        scraper = self.get_scraper(sport)
+        if not scraper:
+            return {'error': f'No scraper found for {sport}', 'stats': []}
+        
+        stats = scraper.get_team_stats(team, year)
+        return {
+            'sport': sport,
+            'team': team,
+            'year': year,
+            'stats': stats,
+            'count': len(stats)
+        }
+    
+    async def get_season_phase(self, sport: str, db: Session) -> Dict[str, Any]:
+        """Get current season phase for a sport"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}'}
+        
+        scraper = self.get_scraper(sport)
+        if not scraper:
+            return {'error': f'No scraper found for {sport}'}
+        
+        phase = scraper.get_season_phase()
+        self._store_season_phase(db, sport, phase)
+        return phase
+    
+    def manual_add_gameline(self, sport: str, db: Session, game_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a single gameline manually"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}'}
+        
+        # Validate required fields
+        required = ['home_team', 'away_team', 'game_day']
+        for field in required:
+            if field not in game_data or not game_data[field]:
+                return {'error': f'Missing required field: {field}'}
+        
+        # Generate game_id if not provided
+        if 'game_id' not in game_data:
+            game_data['game_id'] = f"{sport}_manual_{int(datetime.now().timestamp())}"
+        
+        # Set defaults
+        game_data['sport'] = sport
+        game_data['source'] = 'manual'
+        game_data['is_manual'] = True
+        
+        # Add abbreviations if not provided
+        if 'home_abbr' not in game_data or not game_data['home_abbr']:
+            scraper = self.get_scraper(sport)
+            if scraper:
+                game_data['home_abbr'] = scraper.get_team_abbr(game_data['home_team'])
+                game_data['away_abbr'] = scraper.get_team_abbr(game_data['away_team'])
+        
+        # Store in database
+        success = self._store_single_gameline(db, sport, game_data)
+        
+        if success:
+            return {
+                'message': 'Gameline added successfully',
+                'game': game_data
+            }
+        else:
+            return {'error': 'Failed to add gameline'}
+    
+    def manual_add_gamelines_bulk(self, sport: str, db: Session, games_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Add multiple gamelines manually from JSON data"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}'}
+        
+        if not games_data or not isinstance(games_data, list):
+            return {'error': 'Invalid data format. Expected array of games'}
+        
+        added = 0
+        errors = []
+        
+        for i, game_data in enumerate(games_data):
+            result = self.manual_add_gameline(sport, db, game_data)
+            if 'error' in result:
+                errors.append({'index': i, 'error': result['error']})
+            else:
+                added += 1
+        
+        return {
+            'message': f'Added {added} gamelines',
+            'added': added,
+            'errors': errors,
+            'total': len(games_data)
+        }
+
+# Create singleton instance
+sports_manager = SportsManager()
