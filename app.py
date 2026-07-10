@@ -72,6 +72,8 @@ class GamelineInput(BaseModel):
     game_id: Optional[str] = None
     game_date: str
     start_time: Optional[str] = None
+    home_team: Optional[str] = None
+    away_team: Optional[str] = None
     home_team_id: str
     away_team_id: str
     home_abbr: Optional[str] = None
