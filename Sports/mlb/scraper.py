@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class MLBSraper(BaseSportScraper):
+class MLBScraper(BaseSportScraper):
     def __init__(self):
         super().__init__('mlb')
         self.base_url = 'https://www.baseball-reference.com'
