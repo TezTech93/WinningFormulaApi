@@ -8,13 +8,13 @@ import json
 from core.database import get_db
 from models.gamelines import Gameline
 from models.season_phase import SeasonPhase
-from sports.base_scraper import BaseSportScraper
-from sports.nfl.scraper import NFLScraper
-from sports.nba.scraper import NBAScraper
-from sports.mlb.scraper import MLBScraper
-from sports.nhl.scraper import NHLScraper
-from sports.ncaaf.scraper import NCAAFScraper
-from sports.ncaab.scraper import NCAABScraper
+from Sports.base_scraper import BaseSportScraper
+from Sports.nfl.scraper import NFLScraper
+from Sports.nba.scraper import NBAScraper
+from Sports.mlb.scraper import MLBScraper
+from Sports.nhl.scraper import NHLScraper
+from Sports.ncaaf.scraper import NCAAFScraper
+from Sports.ncaab.scraper import NCAABScraper
 
 logger = logging.getLogger(__name__)
 
