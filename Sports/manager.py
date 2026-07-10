@@ -49,7 +49,7 @@ class SportsManager:
             gamelines = db.query(Gameline).filter(
                 Gameline.sport == sport,
                 Gameline.is_completed == False
-            ).order_by(Gameline.game_day).all()
+            ).order_by(Gameline.game_date).all()
             
             return [g.to_dict() for g in gamelines]
         except Exception as e:
@@ -77,7 +77,7 @@ class SportsManager:
                         sport=sport,
                         source=source,
                         game_id=game.get('game_id', f"{sport}_{int(datetime.now().timestamp())}"),
-                        game_day=datetime.strptime(game.get('game_day'), '%Y-%m-%d').date(),
+                        game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d').date(),
                         start_time=game.get('start_time'),
                         home_team=game.get('home'),
                         away_team=game.get('away'),
@@ -125,7 +125,7 @@ class SportsManager:
                     sport=sport,
                     source='manual',
                     game_id=game_id,
-                    game_day=datetime.strptime(game.get('game_day'), '%Y-%m-%d').date(),
+                    game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d').date(),
                     start_time=game.get('start_time'),
                     home_team=game.get('home_team'),
                     away_team=game.get('away_team'),
@@ -252,7 +252,7 @@ class SportsManager:
             return {'error': f'Unsupported sport: {sport}'}
         
         # Validate required fields
-        required = ['home_team', 'away_team', 'game_day']
+        required = ['home_team', 'away_team', 'game_date']
         for field in required:
             if field not in game_data or not game_data[field]:
                 return {'error': f'Missing required field: {field}'}

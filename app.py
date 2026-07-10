@@ -70,7 +70,7 @@ app.include_router(stats.router)
 # ============ Pydantic Models for Manual Input ============
 class GamelineInput(BaseModel):
     game_id: Optional[str] = None
-    game_day: str
+    game_date: str
     start_time: Optional[str] = None
     home_team: str
     away_team: str
@@ -299,7 +299,7 @@ async def manual_input_form(request: Request, sport: str):
                 <div class="form-row">
                     <div class="form-group">
                         <label>Game Day <span class="required">*</span></label>
-                        <input type="date" name="game_day" required value="{datetime.now().strftime('%Y-%m-%d')}">
+                        <input type="date" name="game_date" required value="{datetime.now().strftime('%Y-%m-%d')}">
                     </div>
                     <div class="form-group">
                         <label>Start Time</label>
@@ -423,7 +423,7 @@ async def manual_input_form(request: Request, sport: str):
                         // Convert boolean strings
                         if (key === 'is_completed') {{
                             data[key] = value === 'true';
-                        }} else if (!isNaN(value) && value !== '' && key !== 'game_day' && key !== 'start_time' && key !== 'game_id') {{
+                        }} else if (!isNaN(value) && value !== '' && key !== 'game_date' && key !== 'start_time' && key !== 'game_id') {{
                             data[key] = parseFloat(value);
                         }} else {{
                             data[key] = value;
@@ -692,7 +692,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                 <h3>ℹ️ Instructions</h3>
                 <p>
                     Paste a JSON array of gameline objects below. Each object should contain the same fields as the single form.
-                    Required fields: <code>game_day</code>, <code>home_team</code>, <code>away_team</code>
+                    Required fields: <code>game_date</code>, <code>home_team</code>, <code>away_team</code>
                 </p>
             </div>
             
@@ -703,7 +703,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                     <label>JSON Data <span class="required">*</span></label>
                     <textarea id="jsonData" name="json_data" required placeholder='[
                     {{
-                        "game_day": "{datetime.now().strftime('%Y-%m-%d')}",
+                        "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
                         "home_team": "Detroit Lions",
                         "away_team": "Green Bay Packers",
                         "home_abbr": "DET",
@@ -712,7 +712,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                         "over_under": 44.5
                     }},
                     {{
-                        "game_day": "{datetime.now().strftime('%Y-%m-%d')}",
+                        "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
                         "home_team": "Kansas City Chiefs",
                         "away_team": "Denver Broncos",
                         "home_abbr": "KC",
@@ -727,7 +727,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                     <strong>📋 Example JSON:</strong>
                     <pre>[
                     {{
-                        "game_day": "{datetime.now().strftime('%Y-%m-%d')}",
+                        "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
                         "home_team": "Detroit Lions",
                         "away_team": "Green Bay Packers",
                         "home_abbr": "DET",
@@ -743,7 +743,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                         "under_odds": -110
                     }},
                     {{
-                        "game_day": "{datetime.now().strftime('%Y-%m-%d')}",
+                        "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
                         "home_team": "Kansas City Chiefs",
                         "away_team": "Denver Broncos",
                         "home_abbr": "KC",
