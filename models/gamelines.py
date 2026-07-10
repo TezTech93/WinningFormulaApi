@@ -7,7 +7,7 @@ from datetime import datetime
 from core.database import Base
 
 class Gameline(Base):
-    __tablename__ = "gamelines"
+    __tablename__ = "gamelinesDB"
     
     id = Column(Integer, primary_key=True, index=True)
     sport = Column(String(10), nullable=False, index=True)
@@ -15,8 +15,8 @@ class Gameline(Base):
     game_id = Column(String(50), nullable=False, unique=True, index=True)
     game_date = Column(Date, nullable=False, index=True)
     start_time = Column(String(20), nullable=True)
-    home_team = Column(String(100), nullable=False)
-    away_team = Column(String(100), nullable=False)
+    home_team_id = Column(String(100), nullable=False)
+    away_team_id = Column(String(100), nullable=False)
     home_abbr = Column(String(10), nullable=True)
     away_abbr = Column(String(10), nullable=True)
     home_ml = Column(Integer, nullable=True)
@@ -44,8 +44,8 @@ class Gameline(Base):
             'game_id': self.game_id,
             'game_date': self.game_date.isoformat() if self.game_date else None,
             'start_time': self.start_time,
-            'home_team': self.home_team,
-            'away_team': self.away_team,
+            'home_team_id': self.home_team,
+            'away_team_id': self.away_team,
             'home_abbr': self.home_abbr,
             'away_abbr': self.away_abbr,
             'home_ml': self.home_ml,
