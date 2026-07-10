@@ -4,7 +4,7 @@ import json
 import datetime as dt
 from typing import Dict, List, Optional, Any
 from bs4 import BeautifulSoup
-from sports.base_scraper import BaseSportScraper
+from Sports.base_scraper import BaseSportScraper
 import logging
 
 logger = logging.getLogger(__name__)
