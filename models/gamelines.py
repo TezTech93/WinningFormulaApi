@@ -13,7 +13,7 @@ class Gameline(Base):
     sport = Column(String(10), nullable=False, index=True)
     source = Column(String(50), nullable=False)
     game_id = Column(String(50), nullable=False, unique=True, index=True)
-    game_day = Column(Date, nullable=False, index=True)
+    game_date = Column(Date, nullable=False, index=True)
     start_time = Column(String(20), nullable=True)
     home_team = Column(String(100), nullable=False)
     away_team = Column(String(100), nullable=False)
@@ -42,7 +42,7 @@ class Gameline(Base):
             'sport': self.sport,
             'source': self.source,
             'game_id': self.game_id,
-            'game_day': self.game_day.isoformat() if self.game_day else None,
+            'game_date': self.game_date.isoformat() if self.game_date else None,
             'start_time': self.start_time,
             'home_team': self.home_team,
             'away_team': self.away_team,
