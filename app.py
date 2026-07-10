@@ -72,8 +72,8 @@ class GamelineInput(BaseModel):
     game_id: Optional[str] = None
     game_date: str
     start_time: Optional[str] = None
-    home_team: str
-    away_team: str
+    home_team_id: str
+    away_team_id: str
     home_abbr: Optional[str] = None
     away_abbr: Optional[str] = None
     home_ml: Optional[int] = None
@@ -310,11 +310,11 @@ async def manual_input_form(request: Request, sport: str):
                 <div class="form-row">
                     <div class="form-group">
                         <label>Home Team <span class="required">*</span></label>
-                        <input type="text" name="home_team" placeholder="Detroit Lions" required>
+                        <input type="text" name="home_team_id" placeholder="Detroit Lions" required>
                     </div>
                     <div class="form-group">
                         <label>Away Team <span class="required">*</span></label>
-                        <input type="text" name="away_team" placeholder="Green Bay Packers" required>
+                        <input type="text" name="away_team_id" placeholder="Green Bay Packers" required>
                     </div>
                 </div>
                 
@@ -692,7 +692,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                 <h3>ℹ️ Instructions</h3>
                 <p>
                     Paste a JSON array of gameline objects below. Each object should contain the same fields as the single form.
-                    Required fields: <code>game_date</code>, <code>home_team</code>, <code>away_team</code>
+                    Required fields: <code>game_date</code>, <code>home_team_id</code>, <code>away_team_id</code>
                 </p>
             </div>
             
@@ -704,8 +704,8 @@ async def manual_input_bulk_form(request: Request, sport: str):
                     <textarea id="jsonData" name="json_data" required placeholder='[
                     {{
                         "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
-                        "home_team": "Detroit Lions",
-                        "away_team": "Green Bay Packers",
+                        "home_team_id": "Detroit Lions",
+                        "away_team_id": "Green Bay Packers",
                         "home_abbr": "DET",
                         "away_abbr": "GB",
                         "home_spread": -3.5,
@@ -713,8 +713,8 @@ async def manual_input_bulk_form(request: Request, sport: str):
                     }},
                     {{
                         "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
-                        "home_team": "Kansas City Chiefs",
-                        "away_team": "Denver Broncos",
+                        "home_team_id": "Kansas City Chiefs",
+                        "away_team_id": "Denver Broncos",
                         "home_abbr": "KC",
                         "away_abbr": "DEN",
                         "home_spread": -2.5,
@@ -728,8 +728,8 @@ async def manual_input_bulk_form(request: Request, sport: str):
                     <pre>[
                     {{
                         "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
-                        "home_team": "Detroit Lions",
-                        "away_team": "Green Bay Packers",
+                        "home_team_id": "Detroit Lions",
+                        "away_team_id": "Green Bay Packers",
                         "home_abbr": "DET",
                         "away_abbr": "GB",
                         "home_ml": -150,
@@ -744,8 +744,8 @@ async def manual_input_bulk_form(request: Request, sport: str):
                     }},
                     {{
                         "game_date": "{datetime.now().strftime('%Y-%m-%d')}",
-                        "home_team": "Kansas City Chiefs",
-                        "away_team": "Denver Broncos",
+                        "home_team_id": "Kansas City Chiefs",
+                        "away_team_id": "Denver Broncos",
                         "home_abbr": "KC",
                         "away_abbr": "DEN",
                         "home_spread": -2.5,
