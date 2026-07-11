@@ -57,7 +57,7 @@ class SportsManager:
             return []
     
     def _store_gamelines(self, db: Session, sport: str, games: List[Dict], source: str = 'web_scraper'):
-        """Store gamelines in PostgreSQL database"""
+    """Store gamelines in PostgreSQL database"""
         try:
             for game in games:
                 # Check if game already exists
@@ -66,33 +66,36 @@ class SportsManager:
                 ).first()
                 
                 if existing:
-                    # Update existing
+                    # Update existing - only update fields that exist
                     for key, value in game.items():
+                        # Skip keys that aren't in the model
                         if hasattr(existing, key) and value is not None:
                             setattr(existing, key, value)
                     existing.updated_at = datetime.now()
                 else:
-                    # Create new
+                    # Create new - match your database schema exactly
                     new_gameline = Gameline(
                         sport=sport,
                         source=source,
                         game_id=game.get('game_id', f"{sport}_{int(datetime.now().timestamp())}"),
-                        game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d').date(),
+                        game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d'),
                         start_time=game.get('start_time'),
-                        home_team=game.get('home'),
-                        away_team=game.get('away'),
-                        home_abbr=game.get('home_abbr'),
-                        away_abbr=game.get('away_abbr'),
+                        home_team_id=int(game.get('home_team_id') or game.get('home', 0)),
+                        away_team_id=int(game.get('away_team_id') or game.get('away', 0)),
+                        home_abbr=game.get('home_abbr') or game.get('home', '')[:3].upper(),
+                        away_abbr=game.get('away_abbr') or game.get('away', '')[:3].upper(),
                         home_ml=game.get('home_ml'),
                         away_ml=game.get('away_ml'),
                         home_spread=game.get('home_spread'),
                         away_spread=game.get('away_spread'),
-                        home_spread_odds=game.get('home_spread_odds'),
-                        away_spread_odds=game.get('away_spread_odds'),
+                        home_spread_odds=game.get('home_spread_odds', -110),
+                        away_spread_odds=game.get('away_spread_odds', -110),
                         total=game.get('total'),
-                        over_odds=game.get('over_odds'),
-                        under_odds=game.get('under_odds'),
+                        over_odds=game.get('over_odds', -110),
+                        under_odds=game.get('under_odds', -110),
                         is_completed=game.get('is_completed', False),
+                        home_score=game.get('home_score'),
+                        away_score=game.get('away_score')
                     )
                     db.add(new_gameline)
             
@@ -101,33 +104,29 @@ class SportsManager:
         except Exception as e:
             logger.error(f"Error storing gamelines: {e}")
             db.rollback()
-    
+
     def _store_single_gameline(self, db: Session, sport: str, game: Dict) -> bool:
         """Store a single gameline in PostgreSQL database"""
         try:
-            # Check if game already exists
             game_id = game.get('game_id', f"{sport}_manual_{int(datetime.now().timestamp())}")
             existing = db.query(Gameline).filter(
                 Gameline.game_id == game_id
             ).first()
             
             if existing:
-                # Update existing
                 for key, value in game.items():
                     if hasattr(existing, key) and value is not None:
                         setattr(existing, key, value)
                 existing.updated_at = datetime.now()
-                existing.is_manual = True
             else:
-                # Create new
                 new_gameline = Gameline(
                     sport=sport,
                     source='manual',
                     game_id=game_id,
-                    game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d').date(),
+                    game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d'),
                     start_time=game.get('start_time'),
-                    home_team=game.get('home_team'),
-                    away_team=game.get('away_team'),
+                    home_team_id=int(game.get('home_team_id')),  # Convert to int
+                    away_team_id=int(game.get('away_team_id')),  # Convert to int
                     home_abbr=game.get('home_abbr'),
                     away_abbr=game.get('away_abbr'),
                     home_ml=game.get('home_ml'),
@@ -139,13 +138,12 @@ class SportsManager:
                     total=game.get('total'),
                     over_odds=game.get('over_odds'),
                     under_odds=game.get('under_odds'),
-                    is_completed=game.get('is_completed', False),
-                    is_manual=True
+                    is_completed=game.get('is_completed', False)
                 )
                 db.add(new_gameline)
             
             db.commit()
-            logger.info(f"Manually stored gameline: {game.get('home_team')} vs {game.get('away_team')}")
+            logger.info(f"Stored gameline: {game.get('home_team_id')} vs {game.get('away_team_id')}")
             return True
         except Exception as e:
             logger.error(f"Error storing manual gameline: {e}")
