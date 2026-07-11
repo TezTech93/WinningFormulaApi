@@ -1079,6 +1079,39 @@ async def read_root():
         "database": "PostgreSQL"
     }
 
+from core.database import get_table_schema_json, get_all_schemas_json, get_table_columns
+
+@app.get("/admin/schema")
+async def get_database_schema():
+    """Get database schema information (for debugging)"""
+    return get_all_schemas_json()
+
+@app.get("/admin/schema/{table_name}")
+async def get_table_schema(table_name: str):
+    """Get schema for a specific table"""
+    schema = get_table_schema_json(table_name)
+    if not schema['columns']:
+        raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found")
+    return schema
+
+@app.get("/admin/tables")
+async def get_database_tables():
+    """Get list of all tables in the database"""
+    try:
+        from core.database import get_db
+        db = next(get_db())
+        result = db.execute(text("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """))
+        tables = [row[0] for row in result]
+        db.close()
+        return {'tables': tables, 'count': len(tables)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/health")
 async def health_check():
     db_status = check_db_connection()

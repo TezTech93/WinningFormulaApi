@@ -31,7 +31,6 @@ class Gameline(Base):
     is_completed = Column(Boolean, default=False)
     home_score = Column(Integer, nullable=True)
     away_score = Column(Integer, nullable=True)
-    is_manual = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -60,7 +59,6 @@ class Gameline(Base):
             'is_completed': self.is_completed,
             'home_score': self.home_score,
             'away_score': self.away_score,
-            'is_manual': self.is_manual,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
