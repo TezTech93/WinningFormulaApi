@@ -15,8 +15,6 @@ class Gameline(Base):
     game_id = Column(String(50), nullable=False, unique=True, index=True)
     game_date = Column(Date, nullable=False, index=True)
     start_time = Column(String(20), nullable=True)
-    home_team = Column(String(50), nullable=True)
-    away_team = Column(String(50), nullable=True)
     home_team_id = Column(String(100), nullable=False)
     away_team_id = Column(String(100), nullable=False)
     home_abbr = Column(String(10), nullable=True)

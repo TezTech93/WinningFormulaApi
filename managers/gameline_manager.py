@@ -21,8 +21,6 @@ class GamelineManager:
             game_id=data.get('game_id'),
             home_team_id=data.get('home_team_id'),
             away_team_id=data.get('away_team_id'),
-            home_team=data.get('home_team'),
-            away_team=data.get('away_team'),
             home_abbr=data.get('home_abbr'),
             away_abbr=data.get('away_abbr'),
             home_ml=data.get('home_ml'),
