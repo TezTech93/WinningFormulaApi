@@ -25,7 +25,7 @@ class Gameline(Base):
     away_spread = Column(Float, nullable=True)
     home_spread_odds = Column(Integer, nullable=True)
     away_spread_odds = Column(Integer, nullable=True)
-    over_under = Column(Float, nullable=True)
+    total = Column(Float, nullable=True)
     over_odds = Column(Integer, nullable=True)
     under_odds = Column(Integer, nullable=True)
     is_completed = Column(Boolean, default=False)
@@ -54,7 +54,7 @@ class Gameline(Base):
             'away_spread': self.away_spread,
             'home_spread_odds': self.home_spread_odds,
             'away_spread_odds': self.away_spread_odds,
-            'over_under': self.over_under,
+            'total': self.total,
             'over_odds': self.over_odds,
             'under_odds': self.under_odds,
             'is_completed': self.is_completed,

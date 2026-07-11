@@ -82,7 +82,7 @@ class GamelineInput(BaseModel):
     away_spread: Optional[float] = None
     home_spread_odds: Optional[int] = None
     away_spread_odds: Optional[int] = None
-    over_under: Optional[float] = None
+    total: Optional[float] = None
     over_odds: Optional[int] = None
     under_odds: Optional[int] = None
     is_completed: Optional[bool] = False
@@ -364,8 +364,8 @@ async def manual_input_form(request: Request, sport: str):
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Over/Under</label>
-                        <input type="number" step="0.5" name="over_under" placeholder="44.5">
+                        <label>Total</label>
+                        <input type="number" step="0.5" name="total" placeholder="44.5">
                     </div>
                     <div class="form-group">
                         <label>Game ID (optional)</label>
@@ -718,7 +718,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                         "home_abbr": "KC",
                         "away_abbr": "DEN",
                         "home_spread": -2.5,
-                        "over_under": 42.5
+                        "total": 42.5
                     }}
                 ]'></textarea>
                 </div>
@@ -738,7 +738,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                         "away_spread": 3.5,
                         "home_spread_odds": -110,
                         "away_spread_odds": -110,
-                        "over_under": 44.5,
+                        "total": 44.5,
                         "over_odds": -110,
                         "under_odds": -110
                     }},
@@ -749,7 +749,7 @@ async def manual_input_bulk_form(request: Request, sport: str):
                         "home_abbr": "KC",
                         "away_abbr": "DEN",
                         "home_spread": -2.5,
-                        "over_under": 42.5
+                        "total": 42.5
                     }}
                 ]</pre>
                 </div>
