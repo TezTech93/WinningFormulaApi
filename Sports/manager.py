@@ -57,7 +57,6 @@ class SportsManager:
             return []
     
     def _store_gamelines(self, db: Session, sport: str, games: List[Dict], source: str = 'web_scraper'):
-    """Store gamelines in PostgreSQL database"""
         try:
             for game in games:
                 # Check if game already exists
