@@ -70,10 +70,10 @@ app.include_router(stats.router)
 # ============ Pydantic Models for Manual Input ============
 class GamelineInput(BaseModel):
     game_id: Optional[str] = None
-    game_date: str
+    game_date: str  
     start_time: Optional[str] = None
-    home_team_id: str
-    away_team_id: str
+    home_team_id: int  
+    away_team_id: int  
     home_abbr: Optional[str] = None
     away_abbr: Optional[str] = None
     home_ml: Optional[int] = None
@@ -82,10 +82,11 @@ class GamelineInput(BaseModel):
     away_spread: Optional[float] = None
     home_spread_odds: Optional[int] = None
     away_spread_odds: Optional[int] = None
-    total: Optional[float] = None
+    total: Optional[float] = None  
     over_odds: Optional[int] = None
     under_odds: Optional[int] = None
     is_completed: Optional[bool] = False
+
 
 # ============ Manual Input HTML Form Routes ============
 @app.get("/manual/{sport}", response_class=HTMLResponse)

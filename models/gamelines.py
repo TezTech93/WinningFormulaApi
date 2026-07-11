@@ -1,7 +1,6 @@
 # models/gameline.py
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Date
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, TIMESTAMP
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from core.database import Base
@@ -13,22 +12,25 @@ class Gameline(Base):
     sport = Column(String(10), nullable=False, index=True)
     source = Column(String(50), nullable=False)
     game_id = Column(String(50), nullable=False, unique=True, index=True)
-    game_date = Column(Date, nullable=False, index=True)
+    game_date = Column(TIMESTAMP, nullable=False, index=True)  # TIMESTAMP, not Date
     start_time = Column(String(20), nullable=True)
-    home_team_id = Column(String(100), nullable=False)
-    away_team_id = Column(String(100), nullable=False)
-    home_abbr = Column(String(10), nullable=True)
-    away_abbr = Column(String(10), nullable=True)
+    
+    # Your database uses INTEGER for team IDs
+    home_team_id = Column(Integer, nullable=False)
+    away_team_id = Column(Integer, nullable=False)
+    home_abbr = Column(String(10), nullable=False)
+    away_abbr = Column(String(10), nullable=False)
+    
     home_ml = Column(Integer, nullable=True)
     away_ml = Column(Integer, nullable=True)
     home_spread = Column(Float, nullable=True)
     away_spread = Column(Float, nullable=True)
     home_spread_odds = Column(Integer, nullable=True)
     away_spread_odds = Column(Integer, nullable=True)
-    total = Column(Float, nullable=True)
+    total = Column(Float, nullable=True)  # Your schema uses 'total'
     over_odds = Column(Integer, nullable=True)
     under_odds = Column(Integer, nullable=True)
-    is_completed = Column(Boolean, default=False)
+    is_completed = Column(Boolean, default=False, nullable=True)
     home_score = Column(Integer, nullable=True)
     away_score = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -43,8 +45,8 @@ class Gameline(Base):
             'game_id': self.game_id,
             'game_date': self.game_date.isoformat() if self.game_date else None,
             'start_time': self.start_time,
-            'home_team_id': self.home_team,
-            'away_team_id': self.away_team,
+            'home_team_id': self.home_team_id,
+            'away_team_id': self.away_team_id,
             'home_abbr': self.home_abbr,
             'away_abbr': self.away_abbr,
             'home_ml': self.home_ml,
