@@ -93,7 +93,6 @@ class SportsManager:
                         over_odds=game.get('over_odds'),
                         under_odds=game.get('under_odds'),
                         is_completed=game.get('is_completed', False),
-                        is_manual=False
                     )
                     db.add(new_gameline)
             
