@@ -56,6 +56,22 @@ async def startup_event():
             logger.info("PostgreSQL connection successful")
         else:
             logger.error("PostgreSQL connection failed")
+
+
+        from utils.seed_teams import seed_all_teams
+        
+        db = next(get_db())
+        try:
+            results = seed_all_teams(db)
+            for sport, data in results.items():
+                if data['added'] > 0:
+                    logger.info(f"Seeded {data['added']} {sport.upper()} teams")
+        except Exception as e:
+            logger.error(f"Error seeding teams: {e}")
+        finally:
+            db.close()
+
+
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
 
