@@ -57,6 +57,7 @@ class SportsManager:
             return []
     
     def _store_gamelines(self, db: Session, sport: str, games: List[Dict], source: str = 'web_scraper'):
+        """Store gamelines in PostgreSQL database"""
         try:
             for game in games:
                 # Check if game already exists
@@ -67,7 +68,6 @@ class SportsManager:
                 if existing:
                     # Update existing - only update fields that exist
                     for key, value in game.items():
-                        # Skip keys that aren't in the model
                         if hasattr(existing, key) and value is not None:
                             setattr(existing, key, value)
                     existing.updated_at = datetime.now()
@@ -124,20 +124,22 @@ class SportsManager:
                     game_id=game_id,
                     game_date=datetime.strptime(game.get('game_date'), '%Y-%m-%d'),
                     start_time=game.get('start_time'),
-                    home_team_id=int(game.get('home_team_id')),  # Convert to int
-                    away_team_id=int(game.get('away_team_id')),  # Convert to int
-                    home_abbr=game.get('home_abbr'),
-                    away_abbr=game.get('away_abbr'),
+                    home_team_id=int(game.get('home_team_id', 0)),
+                    away_team_id=int(game.get('away_team_id', 0)),
+                    home_abbr=game.get('home_abbr', '')[:3].upper(),
+                    away_abbr=game.get('away_abbr', '')[:3].upper(),
                     home_ml=game.get('home_ml'),
                     away_ml=game.get('away_ml'),
                     home_spread=game.get('home_spread'),
                     away_spread=game.get('away_spread'),
-                    home_spread_odds=game.get('home_spread_odds'),
-                    away_spread_odds=game.get('away_spread_odds'),
+                    home_spread_odds=game.get('home_spread_odds', -110),
+                    away_spread_odds=game.get('away_spread_odds', -110),
                     total=game.get('total'),
-                    over_odds=game.get('over_odds'),
-                    under_odds=game.get('under_odds'),
-                    is_completed=game.get('is_completed', False)
+                    over_odds=game.get('over_odds', -110),
+                    under_odds=game.get('under_odds', -110),
+                    is_completed=game.get('is_completed', False),
+                    home_score=game.get('home_score'),
+                    away_score=game.get('away_score')
                 )
                 db.add(new_gameline)
             
@@ -247,27 +249,64 @@ class SportsManager:
         if sport not in self.SUPPORTED_SPORTS:
             return {'error': f'Unsupported sport: {sport}'}
         
-        # Validate required fields
-        required = ['home_team', 'away_team', 'game_date']
+        # Normalize field names - handle both naming conventions
+        # If home_team is provided but home_team_id isn't, use home_team as home_team_id
+        if 'home_team' in game_data and 'home_team_id' not in game_data:
+            game_data['home_team_id'] = game_data['home_team']
+        if 'away_team' in game_data and 'away_team_id' not in game_data:
+            game_data['away_team_id'] = game_data['away_team']
+        
+        # If home_team_id is a string (team name), convert to integer using scraper
+        if 'home_team_id' in game_data and isinstance(game_data['home_team_id'], str):
+            scraper = self.get_scraper(sport)
+            if scraper:
+                # Try to find team ID from name
+                team_name = game_data['home_team_id']
+                # For now, use a hash or lookup - but since we have integer IDs,
+                # we should use the integer IDs directly in the JSON
+                # This is a fallback for when strings are provided
+                try:
+                    # If it's a string that looks like a number, convert it
+                    game_data['home_team_id'] = int(team_name) if team_name.isdigit() else 0
+                except:
+                    game_data['home_team_id'] = 0
+        
+        if 'away_team_id' in game_data and isinstance(game_data['away_team_id'], str):
+            try:
+                game_data['away_team_id'] = int(game_data['away_team_id']) if game_data['away_team_id'].isdigit() else 0
+            except:
+                game_data['away_team_id'] = 0
+        
+        # Validate required fields - use home_team_id and away_team_id
+        required = ['home_team_id', 'away_team_id', 'game_date']
         for field in required:
-            if field not in game_data or not game_data[field]:
+            if field not in game_data or game_data[field] is None or game_data[field] == '':
                 return {'error': f'Missing required field: {field}'}
         
+        # Ensure home_team_id and away_team_id are integers
+        try:
+            game_data['home_team_id'] = int(game_data['home_team_id'])
+            game_data['away_team_id'] = int(game_data['away_team_id'])
+        except (ValueError, TypeError):
+            return {'error': 'home_team_id and away_team_id must be integers'}
+        
         # Generate game_id if not provided
-        if 'game_id' not in game_data:
+        if 'game_id' not in game_data or not game_data['game_id']:
             game_data['game_id'] = f"{sport}_manual_{int(datetime.now().timestamp())}"
         
         # Set defaults
         game_data['sport'] = sport
         game_data['source'] = 'manual'
-        game_data['is_manual'] = True
         
         # Add abbreviations if not provided
         if 'home_abbr' not in game_data or not game_data['home_abbr']:
             scraper = self.get_scraper(sport)
             if scraper:
-                game_data['home_abbr'] = scraper.get_team_abbr(game_data['home_team'])
-                game_data['away_abbr'] = scraper.get_team_abbr(game_data['away_team'])
+                # For abbreviations, we need to map from team ID to abbreviation
+                # Since we don't have a teams table, use the home_team_id as a placeholder
+                # or use the provided home_abbr
+                game_data['home_abbr'] = game_data.get('home_abbr', f"T{game_data['home_team_id']}")
+                game_data['away_abbr'] = game_data.get('away_abbr', f"T{game_data['away_team_id']}")
         
         # Store in database
         success = self._store_single_gameline(db, sport, game_data)
@@ -292,6 +331,26 @@ class SportsManager:
         errors = []
         
         for i, game_data in enumerate(games_data):
+            # Normalize field names for bulk data too
+            if 'home_team' in game_data and 'home_team_id' not in game_data:
+                game_data['home_team_id'] = game_data['home_team']
+            if 'away_team' in game_data and 'away_team_id' not in game_data:
+                game_data['away_team_id'] = game_data['away_team']
+            
+            # Ensure integers
+            try:
+                if 'home_team_id' in game_data:
+                    game_data['home_team_id'] = int(game_data['home_team_id'])
+                if 'away_team_id' in game_data:
+                    game_data['away_team_id'] = int(game_data['away_team_id'])
+            except (ValueError, TypeError):
+                errors.append({'index': i, 'error': 'home_team_id and away_team_id must be integers'})
+                continue
+            
+            # Convert over_under to total if present
+            if 'over_under' in game_data and 'total' not in game_data:
+                game_data['total'] = game_data['over_under']
+            
             result = self.manual_add_gameline(sport, db, game_data)
             if 'error' in result:
                 errors.append({'index': i, 'error': result['error']})
