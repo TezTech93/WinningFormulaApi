@@ -1139,6 +1139,159 @@ async def health_check():
         "supported_sports": sports_manager.SUPPORTED_SPORTS
     }
 
+# ============ TEAM MANAGEMENT ENDPOINTS ============
+
+@app.get("/teams/{sport}")
+async def get_teams(
+    sport: str,
+    conference: Optional[str] = Query(None, description="Filter by conference"),
+    division: Optional[str] = Query(None, description="Filter by division"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all teams for a specific sport.
+    
+    Optional filters:
+    - conference: Filter by conference (e.g., 'AFC', 'NFC')
+    - division: Filter by division (e.g., 'North', 'South')
+    """
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    if conference:
+        result = sports_manager.get_teams_by_conference(sport, conference, db)
+    elif division:
+        result = sports_manager.get_teams_by_division(sport, division, db)
+    else:
+        result = sports_manager.get_teams(sport, db)
+    
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    
+    return result
+
+@app.get("/teams/{sport}/{team_id}")
+async def get_team_by_id(
+    sport: str,
+    team_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a specific team by ID"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    team = sports_manager.get_team_by_id(sport, team_id, db)
+    if not team:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Team not found for {sport} with ID {team_id}"
+        )
+    return team
+
+@app.get("/teams/{sport}/abbr/{abbr}")
+async def get_team_by_abbr(
+    sport: str,
+    abbr: str,
+    db: Session = Depends(get_db)
+):
+    """Get a team by abbreviation (e.g., 'NE', 'KC', 'SEA')"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    team = sports_manager.get_team_by_abbr(sport, abbr, db)
+    if not team:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Team not found for {sport} with abbreviation '{abbr}'"
+        )
+    return team
+
+@app.get("/teams/{sport}/name/{name}")
+async def get_team_by_name(
+    sport: str,
+    name: str,
+    db: Session = Depends(get_db)
+):
+    """Get a team by name (partial match allowed)"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    team = sports_manager.get_team_by_name(sport, name, db)
+    if not team:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Team not found for {sport} with name containing '{name}'"
+        )
+    return team
+
+@app.get("/teams/{sport}/conferences")
+async def get_conferences(
+    sport: str,
+    db: Session = Depends(get_db)
+):
+    """Get all conferences for a sport"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    result = sports_manager.get_conferences(sport, db)
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+@app.get("/teams/{sport}/divisions")
+async def get_divisions(
+    sport: str,
+    db: Session = Depends(get_db)
+):
+    """Get all divisions for a sport"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    result = sports_manager.get_divisions(sport, db)
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+@app.post("/teams/{sport}/seed")
+async def seed_teams(
+    sport: str,
+    db: Session = Depends(get_db)
+):
+    """Seed teams for a specific sport from hardcoded data"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    result = sports_manager.seed_teams(sport, db)
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+@app.post("/teams/seed/all")
+async def seed_all_teams(
+    db: Session = Depends(get_db)
+):
+    """Seed all sports teams from hardcoded data"""
+    result = sports_manager.seed_all_teams(db)
+    return result
+
+@app.get("/teams/{sport}/stats/{team_id}")
+async def get_team_stats(
+    sport: str,
+    team_id: int,
+    year: Optional[int] = Query(None, description="Filter by year"),
+    db: Session = Depends(get_db)
+):
+    """Get team stats by team ID"""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+    
+    result = sports_manager.get_team_stats_by_team_id(sport, team_id, year, db)
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+# ============ End of Team Management Endpoints ============
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

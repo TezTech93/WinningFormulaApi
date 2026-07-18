@@ -7,6 +7,7 @@ import json
 
 from core.database import get_db
 from models.gamelines import Gameline
+from models.team import Team
 from models.season_phase import SeasonPhase
 from Sports.base_scraper import BaseSportScraper
 from Sports.nfl.scraper import NFLScraper
@@ -16,12 +17,28 @@ from Sports.nhl.scraper import NHLScraper
 from Sports.ncaaf.scraper import NCAAFScraper
 from Sports.ncaab.scraper import NCAABScraper
 
+# Import team data
+from Sports.nfl.nfl_teams import nfl_teams
+from Sports.nba.nba_teams import nba_teams
+from Sports.mlb.mlb_teams import mlb_teams
+from Sports.nhl.nhl_teams import nhl_teams
+
 logger = logging.getLogger(__name__)
 
 class SportsManager:
     """Unified manager for all sports with PostgreSQL support"""
     
     SUPPORTED_SPORTS = ['nfl', 'nba', 'mlb', 'nhl', 'ncaaf', 'ncaab']
+    
+    # Team data mappings
+    TEAM_DATA = {
+        'nfl': nfl_teams,
+        'nba': nba_teams,
+        'mlb': mlb_teams,
+        'nhl': nhl_teams,
+        # 'ncaaf': ncaaf_teams,  # Add when available
+        # 'ncaab': ncaab_teams,  # Add when available
+    }
     
     def __init__(self):
         self.scrapers = {}
@@ -42,6 +59,380 @@ class SportsManager:
     def get_scraper(self, sport: str) -> Optional[BaseSportScraper]:
         """Get scraper for a specific sport"""
         return self.scrapers.get(sport)
+    
+    # ==================== TEAM MANAGEMENT ====================
+    
+    def get_teams(self, sport: str, db: Session) -> Dict[str, Any]:
+        """Get all teams for a sport from database or fallback to hardcoded data"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'teams': [], 'count': 0}
+        
+        try:
+            # Try to get teams from database first
+            teams = db.query(Team).filter(Team.sport == sport).order_by(Team.name).all()
+            
+            if teams:
+                return {
+                    'sport': sport,
+                    'source': 'database',
+                    'teams': [team.to_dict() for team in teams],
+                    'count': len(teams)
+                }
+        except Exception as e:
+            logger.warning(f"Could not fetch teams from database: {e}")
+        
+        # Fallback to hardcoded team data
+        teams_data = self.TEAM_DATA.get(sport, [])
+        formatted_teams = []
+        
+        for idx, team in enumerate(teams_data, start=1):
+            formatted_teams.append({
+                'id': idx,
+                'sport': sport,
+                'name': f"{team['city']} {team['teamName']}",
+                'abbreviation': team['abv'].upper(),
+                'conference': None,
+                'division': None,
+                'city': team['city'],
+            })
+        
+        return {
+            'sport': sport,
+            'source': 'hardcoded',
+            'teams': formatted_teams,
+            'count': len(formatted_teams)
+        }
+    
+    def get_team_by_id(self, sport: str, team_id: int, db: Session) -> Optional[Dict]:
+        """Get a specific team by ID"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return None
+        
+        try:
+            # Try database first
+            team = db.query(Team).filter(
+                Team.sport == sport,
+                Team.id == team_id
+            ).first()
+            
+            if team:
+                return team.to_dict()
+        except Exception as e:
+            logger.warning(f"Could not fetch team from database: {e}")
+        
+        # Fallback to hardcoded
+        teams_data = self.TEAM_DATA.get(sport, [])
+        if 1 <= team_id <= len(teams_data):
+            team = teams_data[team_id - 1]
+            return {
+                'id': team_id,
+                'sport': sport,
+                'name': f"{team['city']} {team['teamName']}",
+                'abbreviation': team['abv'].upper(),
+                'conference': None,
+                'division': None,
+                'city': team['city'],
+            }
+        
+        return None
+    
+    def get_team_by_abbr(self, sport: str, abbr: str, db: Session) -> Optional[Dict]:
+        """Get a team by abbreviation"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return None
+        
+        abbr = abbr.upper()
+        
+        try:
+            # Try database first
+            team = db.query(Team).filter(
+                Team.sport == sport,
+                Team.abbreviation == abbr
+            ).first()
+            
+            if team:
+                return team.to_dict()
+        except Exception as e:
+            logger.warning(f"Could not fetch team from database: {e}")
+        
+        # Fallback to hardcoded
+        teams_data = self.TEAM_DATA.get(sport, [])
+        for idx, team in enumerate(teams_data, start=1):
+            if team['abv'].upper() == abbr:
+                return {
+                    'id': idx,
+                    'sport': sport,
+                    'name': f"{team['city']} {team['teamName']}",
+                    'abbreviation': team['abv'].upper(),
+                    'conference': None,
+                    'division': None,
+                    'city': team['city'],
+                }
+        
+        return None
+    
+    def get_team_by_name(self, sport: str, name: str, db: Session) -> Optional[Dict]:
+        """Get a team by full name (partial match)"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return None
+        
+        try:
+            # Try database first
+            team = db.query(Team).filter(
+                Team.sport == sport,
+                Team.name.ilike(f"%{name}%")
+            ).first()
+            
+            if team:
+                return team.to_dict()
+        except Exception as e:
+            logger.warning(f"Could not fetch team from database: {e}")
+        
+        # Fallback to hardcoded
+        teams_data = self.TEAM_DATA.get(sport, [])
+        for idx, team in enumerate(teams_data, start=1):
+            team_full_name = f"{team['city']} {team['teamName']}"
+            if name.lower() in team_full_name.lower():
+                return {
+                    'id': idx,
+                    'sport': sport,
+                    'name': team_full_name,
+                    'abbreviation': team['abv'].upper(),
+                    'conference': None,
+                    'division': None,
+                    'city': team['city'],
+                }
+        
+        return None
+    
+    def get_teams_by_conference(self, sport: str, conference: str, db: Session) -> Dict[str, Any]:
+        """Get all teams in a specific conference"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'teams': [], 'count': 0}
+        
+        try:
+            teams = db.query(Team).filter(
+                Team.sport == sport,
+                Team.conference == conference
+            ).order_by(Team.name).all()
+            
+            return {
+                'sport': sport,
+                'conference': conference,
+                'source': 'database',
+                'teams': [team.to_dict() for team in teams],
+                'count': len(teams)
+            }
+        except Exception as e:
+            logger.error(f"Error fetching teams by conference: {e}")
+            return {
+                'sport': sport,
+                'conference': conference,
+                'source': 'error',
+                'teams': [],
+                'count': 0,
+                'error': str(e)
+            }
+    
+    def get_teams_by_division(self, sport: str, division: str, db: Session) -> Dict[str, Any]:
+        """Get all teams in a specific division"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'teams': [], 'count': 0}
+        
+        try:
+            teams = db.query(Team).filter(
+                Team.sport == sport,
+                Team.division == division
+            ).order_by(Team.name).all()
+            
+            return {
+                'sport': sport,
+                'division': division,
+                'source': 'database',
+                'teams': [team.to_dict() for team in teams],
+                'count': len(teams)
+            }
+        except Exception as e:
+            logger.error(f"Error fetching teams by division: {e}")
+            return {
+                'sport': sport,
+                'division': division,
+                'source': 'error',
+                'teams': [],
+                'count': 0,
+                'error': str(e)
+            }
+    
+    def get_conferences(self, sport: str, db: Session) -> Dict[str, Any]:
+        """Get all conferences for a sport"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'conferences': []}
+        
+        try:
+            conferences = db.query(Team.conference).filter(
+                Team.sport == sport,
+                Team.conference.isnot(None)
+            ).distinct().all()
+            
+            return {
+                'sport': sport,
+                'source': 'database',
+                'conferences': [c[0] for c in conferences if c[0]]
+            }
+        except Exception as e:
+            logger.error(f"Error fetching conferences: {e}")
+            return {
+                'sport': sport,
+                'source': 'error',
+                'conferences': [],
+                'error': str(e)
+            }
+    
+    def get_divisions(self, sport: str, db: Session) -> Dict[str, Any]:
+        """Get all divisions for a sport"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'divisions': []}
+        
+        try:
+            divisions = db.query(Team.division).filter(
+                Team.sport == sport,
+                Team.division.isnot(None)
+            ).distinct().all()
+            
+            return {
+                'sport': sport,
+                'source': 'database',
+                'divisions': [d[0] for d in divisions if d[0]]
+            }
+        except Exception as e:
+            logger.error(f"Error fetching divisions: {e}")
+            return {
+                'sport': sport,
+                'source': 'error',
+                'divisions': [],
+                'error': str(e)
+            }
+    
+    def seed_teams(self, sport: str, db: Session) -> Dict[str, Any]:
+        """Seed teams into the database from hardcoded data"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}'}
+        
+        teams_data = self.TEAM_DATA.get(sport, [])
+        if not teams_data:
+            return {'error': f'No team data available for {sport}'}
+        
+        added = 0
+        updated = 0
+        
+        for team_data in teams_data:
+            team_name = f"{team_data['city']} {team_data['teamName']}"
+            abbr = team_data['abv'].upper()
+            
+            try:
+                # Check if team already exists
+                existing = db.query(Team).filter(
+                    Team.sport == sport,
+                    Team.abbreviation == abbr
+                ).first()
+                
+                if existing:
+                    # Update existing
+                    existing.name = team_name
+                    existing.abbreviation = abbr
+                    existing.city = team_data['city']
+                    existing.updated_at = datetime.now()
+                    updated += 1
+                else:
+                    # Create new team
+                    team = Team(
+                        sport=sport,
+                        name=team_name,
+                        abbreviation=abbr,
+                        conference=None,
+                        division=None,
+                        city=team_data['city'],
+                        state=None,
+                        stadium=None
+                    )
+                    db.add(team)
+                    added += 1
+            except Exception as e:
+                logger.error(f"Error seeding team {team_name}: {e}")
+                db.rollback()
+                return {
+                    'error': f'Error seeding team {team_name}: {str(e)}',
+                    'sport': sport,
+                    'added': added,
+                    'updated': updated
+                }
+        
+        try:
+            db.commit()
+            logger.info(f"Seeded {added} teams, updated {updated} teams for {sport}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error committing teams: {e}")
+            return {
+                'error': f'Error committing teams: {str(e)}',
+                'sport': sport,
+                'added': added,
+                'updated': updated
+            }
+        
+        return {
+            'message': f'Seeded {added} teams, updated {updated} teams for {sport}',
+            'sport': sport,
+            'added': added,
+            'updated': updated,
+            'total': len(teams_data)
+        }
+    
+    def seed_all_teams(self, db: Session) -> Dict[str, Any]:
+        """Seed all sports teams into the database"""
+        results = {}
+        for sport in self.SUPPORTED_SPORTS:
+            if sport in self.TEAM_DATA:
+                results[sport] = self.seed_teams(sport, db)
+            else:
+                results[sport] = {'error': f'No team data for {sport}'}
+        
+        return results
+    
+    def get_team_stats_by_team_id(self, sport: str, team_id: int, year: Optional[int] = None, db: Session = None) -> Dict[str, Any]:
+        """Get team stats by team ID"""
+        if sport not in self.SUPPORTED_SPORTS:
+            return {'error': f'Unsupported sport: {sport}', 'stats': []}
+        
+        try:
+            from models.team import TeamStats
+            
+            query = db.query(TeamStats).filter(
+                TeamStats.team_id == team_id
+            )
+            
+            if year:
+                query = query.filter(TeamStats.year == year)
+            
+            stats = query.order_by(TeamStats.year.desc()).all()
+            
+            return {
+                'sport': sport,
+                'team_id': team_id,
+                'stats': [stat.to_dict() for stat in stats],
+                'count': len(stats)
+            }
+        except Exception as e:
+            logger.error(f"Error fetching team stats: {e}")
+            return {
+                'sport': sport,
+                'team_id': team_id,
+                'stats': [],
+                'count': 0,
+                'error': str(e)
+            }
+    
+    # ==================== GAMELINE MANAGEMENT ====================
     
     def _get_cached_gamelines(self, db: Session, sport: str) -> List[Dict]:
         """Get cached gamelines from PostgreSQL database"""
@@ -250,34 +641,12 @@ class SportsManager:
             return {'error': f'Unsupported sport: {sport}'}
         
         # Normalize field names - handle both naming conventions
-        # If home_team is provided but home_team_id isn't, use home_team as home_team_id
         if 'home_team' in game_data and 'home_team_id' not in game_data:
             game_data['home_team_id'] = game_data['home_team']
         if 'away_team' in game_data and 'away_team_id' not in game_data:
             game_data['away_team_id'] = game_data['away_team']
         
-        # If home_team_id is a string (team name), convert to integer using scraper
-        if 'home_team_id' in game_data and isinstance(game_data['home_team_id'], str):
-            scraper = self.get_scraper(sport)
-            if scraper:
-                # Try to find team ID from name
-                team_name = game_data['home_team_id']
-                # For now, use a hash or lookup - but since we have integer IDs,
-                # we should use the integer IDs directly in the JSON
-                # This is a fallback for when strings are provided
-                try:
-                    # If it's a string that looks like a number, convert it
-                    game_data['home_team_id'] = int(team_name) if team_name.isdigit() else 0
-                except:
-                    game_data['home_team_id'] = 0
-        
-        if 'away_team_id' in game_data and isinstance(game_data['away_team_id'], str):
-            try:
-                game_data['away_team_id'] = int(game_data['away_team_id']) if game_data['away_team_id'].isdigit() else 0
-            except:
-                game_data['away_team_id'] = 0
-        
-        # Validate required fields - use home_team_id and away_team_id
+        # Validate required fields
         required = ['home_team_id', 'away_team_id', 'game_date']
         for field in required:
             if field not in game_data or game_data[field] is None or game_data[field] == '':
@@ -300,13 +669,19 @@ class SportsManager:
         
         # Add abbreviations if not provided
         if 'home_abbr' not in game_data or not game_data['home_abbr']:
-            scraper = self.get_scraper(sport)
-            if scraper:
-                # For abbreviations, we need to map from team ID to abbreviation
-                # Since we don't have a teams table, use the home_team_id as a placeholder
-                # or use the provided home_abbr
-                game_data['home_abbr'] = game_data.get('home_abbr', f"T{game_data['home_team_id']}")
-                game_data['away_abbr'] = game_data.get('away_abbr', f"T{game_data['away_team_id']}")
+            # Try to get from teams
+            team = self.get_team_by_id(sport, game_data['home_team_id'], db)
+            if team:
+                game_data['home_abbr'] = team['abbreviation']
+            else:
+                game_data['home_abbr'] = f"T{game_data['home_team_id']}"
+        
+        if 'away_abbr' not in game_data or not game_data['away_abbr']:
+            team = self.get_team_by_id(sport, game_data['away_team_id'], db)
+            if team:
+                game_data['away_abbr'] = team['abbreviation']
+            else:
+                game_data['away_abbr'] = f"T{game_data['away_team_id']}"
         
         # Store in database
         success = self._store_single_gameline(db, sport, game_data)
