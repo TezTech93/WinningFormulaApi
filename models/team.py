@@ -21,6 +21,25 @@ class Team(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     stats = relationship("TeamStats", back_populates="team", cascade="all, delete-orphan", lazy="select")
+    
+    def to_dict(self):
+        """Convert team to dictionary for JSON responses"""
+        return {
+            'id': self.id,
+            'sport': self.sport,
+            'name': self.name,
+            'abbreviation': self.abbreviation,
+            'conference': self.conference,
+            'division': self.division,
+            'city': self.city,
+            'state': self.state,
+            'stadium': self.stadium,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    def __repr__(self):
+        return f"<Team(id={self.id}, name='{self.name}', abbr='{self.abbreviation}')>"
 
 class TeamStats(Base):
     __tablename__ = "team_stats"
@@ -34,3 +53,15 @@ class TeamStats(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     team = relationship("Team", back_populates="stats")
+    
+    def to_dict(self):
+        """Convert team stats to dictionary for JSON responses"""
+        return {
+            'id': self.id,
+            'team_id': self.team_id,
+            'year': self.year,
+            'season_type': self.season_type,
+            'stats': self.stats,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
