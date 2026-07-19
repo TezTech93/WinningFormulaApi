@@ -22,6 +22,8 @@ from Sports.nfl.nfl_teams import nfl_teams
 from Sports.nba.nba_teams import nba_teams
 from Sports.mlb.mlb_teams import mlb_teams
 from Sports.nhl.nhl_teams import nhl_teams
+from Sports.ncaab.ncaab_teams import ncaab_teams
+from Sports.ncaaf.ncaaf_teams import ncaaf_teams
 
 logger = logging.getLogger(__name__)
 
