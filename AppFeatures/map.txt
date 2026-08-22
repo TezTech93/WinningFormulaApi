@@ -1,0 +1,18 @@
+Winning Formula (SharpSpreadSheets) Features
+    *Gamelines*
+    - Live Gamelines from multiple sportsbooks
+    *Stats*
+    -Team Stats
+    -Coach Stats
+    -Player Stats
+    *Parlay Picker*
+    -View All possible outcome combos and odds
+    -Decrease possible outcomes with each event user is most confident about
+    *Formulas*
+    -Users create formulas to be used as monte carlo simulations and metrics
+    -Able to track the accuracy of simulations
+    *Strategy*
+    -Help users create strategies for their bank roll
+    --For bankroll management
+    --For win specific target amounts i.e (100,500,1000,5_000,10_000,20_000,50_000,100_000,250_000)
+

@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from typing import Optional, List, Dict, Any
@@ -1289,6 +1290,45 @@ async def get_team_stats(
     if result.get('error'):
         raise HTTPException(status_code=400, detail=result['error'])
     return result
+
+from fastapi import File, UploadFile
+from services.csv_stats_service import CSVStatsService
+
+csv_service = CSVStatsService()
+
+@app.post("/admin/csv/sync/{sport}/{year}/{abbr}")
+async def admin_sync_team_csv(sport: str, year: int, abbr: str):
+    """Admin: sync a team CSV from GitHub."""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(400, f"Unsupported sport: {sport}")
+    success = csv_service.download_csv(sport, year, abbr.upper())
+    if success:
+        return {"message": f"Synced {sport}/{year}/{abbr.upper()}.csv"}
+    raise HTTPException(500, "Download failed")
+
+@app.post("/admin/csv/upload/{sport}/{year}/{abbr}")
+async def admin_upload_team_csv(
+    sport: str,
+    year: int,
+    abbr: str,
+    file: UploadFile = File(...)
+):
+    """Admin: manually upload a CSV file for a team."""
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(400, "Unsupported sport")
+    csv_path = csv_service.get_csv_path(sport, year, abbr.upper())
+    try:
+        content = await file.read()
+        with open(csv_path, 'wb') as f:
+            f.write(content)
+        return {"message": f"Successfully uploaded to {csv_path}"}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+@app.get("/admin/csv/files")
+async def admin_list_csv_files():
+    """Admin: list all cached CSV files."""
+    return csv_service.list_available_files()
 
 # ============ End of Team Management Endpoints ============
 
