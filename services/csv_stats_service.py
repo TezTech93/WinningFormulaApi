@@ -13,7 +13,7 @@ class CSVStatsService:
     Caches files locally and downloads from GitHub on demand.
     """
 
-    GITHUB_RAW_URL = "https://raw.githubusercontent.com/TezTech93/Sports-Stats/main/{sport}/{year}/{abbr}.csv"
+    GITHUB_RAW_URL = "https://raw.githubusercontent.com/TezTech93/Sports-Stats/main/{sport}/{year}/{abbr}_{year}_stats.csv"
     SUPPORTED_SPORTS = ["nfl", "nba", "nhl", "mlb", "ncaaf", "ncaab"]
 
     def __init__(self, data_dir: str = "data"):
@@ -25,8 +25,8 @@ class CSVStatsService:
     # ---------- File Management ----------
 
     def get_csv_path(self, sport: str, year: int, abbr: str) -> Path:
-        """Local path: data/{sport}/{year}/{abbr}.csv"""
-        path = self.data_dir / sport / str(year) / f"{abbr.upper()}.csv"
+        """Local path: data/{sport}/{year}/{abbr}_{year}_stats.csv"""
+        path = self.data_dir / sport / str(year) / f"{abbr.upper()}_{year}_stats.csv"
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
