@@ -1,4 +1,5 @@
 # services/csv_stats_service.py
+import os
 import csv
 import logging
 from pathlib import Path
@@ -6,6 +7,8 @@ from typing import List, Dict, Any, Optional
 import requests
 
 logger = logging.getLogger(__name__)
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 class CSVStatsService:
     """
@@ -60,18 +63,18 @@ class CSVStatsService:
         return self.download_csv(sport, year, abbr)
 
     def download_csv(self, sport: str, year: int, abbr: str) -> bool:
-        """Download a CSV from GitHub to the local cache."""
         file_base = self._get_file_base(sport, abbr)
-        url = self.GITHUB_RAW_URL.format(
-            sport=sport,
-            year=year,
-            file_base=file_base
-        )
+        url = f"https://raw.githubusercontent.com/TezTech93/Sports-Stats/main/{sport}/{year}/{file_base}_{year}_stats.csv"
         path = self.get_csv_path(sport, year, abbr)
+
+        headers = {}
+        github_token = os.getenv("GITHUB_TOKEN")
+        if github_token:
+            headers["Authorization"] = f"token {github_token}"
 
         try:
             logger.info(f"Downloading {url} ...")
-            resp = requests.get(url, timeout=30)
+            resp = requests.get(url, headers=headers, timeout=30)
             resp.raise_for_status()
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(resp.text)
@@ -80,6 +83,26 @@ class CSVStatsService:
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to download {url}: {e}")
             return False
+            """Download a CSV from GitHub to the local cache."""
+            file_base = self._get_file_base(sport, abbr)
+            url = self.GITHUB_RAW_URL.format(
+                sport=sport,
+                year=year,
+                file_base=file_base
+            )
+            path = self.get_csv_path(sport, year, abbr)
+
+            try:
+                logger.info(f"Downloading {url} ...")
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(resp.text)
+                logger.info(f"Cached to {path}")
+                return True
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to download {url}: {e}")
+                return False
 
     # ---------- CSV Parsing ----------
 
