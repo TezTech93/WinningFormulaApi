@@ -13,8 +13,27 @@ class CSVStatsService:
     Caches files locally and downloads from GitHub on demand.
     """
 
-    GITHUB_RAW_URL = "https://raw.githubusercontent.com/TezTech93/Sports-Stats/main/{sport}/{year}/{abbr}_{year}_stats.csv"
+    GITHUB_RAW_URL = "https://raw.githubusercontent.com/TezTech93/Sports-Stats/main/{sport}/{year}/{file_base}_{year}_stats.csv"
     SUPPORTED_SPORTS = ["nfl", "nba", "nhl", "mlb", "ncaaf", "ncaab"]
+
+    # Map frontend abbreviations (what the API receives) to actual file base names.
+    # Example: the frontend sends 'GB' but the file is 'GNB_2025_stats.csv'
+    # Extend this dictionary for any other teams with non‑obvious file names.
+    ABBR_MAPPING = {
+        'nfl': {
+            'GB': 'GNB',      # Green Bay Packers
+            # Add any other NFL overrides here
+        },
+        'nba': {
+            # Add any NBA overrides here
+        },
+        'nhl': {
+            # Add any NHL overrides here
+        },
+        'mlb': {},
+        'ncaaf': {},
+        'ncaab': {}
+    }
 
     def __init__(self, data_dir: str = "data"):
         self.data_dir = Path(data_dir)
@@ -24,9 +43,18 @@ class CSVStatsService:
 
     # ---------- File Management ----------
 
+    def _get_file_base(self, sport: str, abbr: str) -> str:
+        """
+        Return the actual file base name (without '_year_stats') after applying the mapping.
+        If no mapping exists, use the abbreviation as‑is (uppercase).
+        """
+        sport_mapping = self.ABBR_MAPPING.get(sport, {})
+        return sport_mapping.get(abbr.upper(), abbr.upper())
+
     def get_csv_path(self, sport: str, year: int, abbr: str) -> Path:
-        """Local path: data/{sport}/{year}/{abbr}_{year}_stats.csv"""
-        path = self.data_dir / sport / str(year) / f"{abbr.upper()}_{year}_stats.csv"
+        """Local path: data/{sport}/{year}/{file_base}_{year}_stats.csv"""
+        file_base = self._get_file_base(sport, abbr)
+        path = self.data_dir / sport / str(year) / f"{file_base}_{year}_stats.csv"
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -39,7 +67,12 @@ class CSVStatsService:
 
     def download_csv(self, sport: str, year: int, abbr: str) -> bool:
         """Download a CSV from GitHub to the local cache."""
-        url = self.GITHUB_RAW_URL.format(sport=sport, year=year, abbr=abbr.upper())
+        file_base = self._get_file_base(sport, abbr)
+        url = self.GITHUB_RAW_URL.format(
+            sport=sport,
+            year=year,
+            file_base=file_base
+        )
         path = self.get_csv_path(sport, year, abbr)
 
         try:
@@ -84,13 +117,11 @@ class CSVStatsService:
                         if 'week' in col.lower():
                             # This row is the header
                             header = [col.strip() for col in row]
+                            # Store indices where the header is not empty
                             non_empty_indices = [i for i, h in enumerate(header) if h.strip() != '']
-                            # Clean header (keep only non-empty)
-                            header_clean = [h for h in header if h.strip() != '']
-                            # We'll use the original header list and non_empty_indices for data rows
                             break
                     if header is not None:
-                        continue  # skip processing the header row as data
+                        continue  # skip the header row itself
 
                 # Process data rows after header is set
                 if header is not None:
@@ -178,11 +209,13 @@ class CSVStatsService:
             'record': record,
             'totals': totals,
             'averages': averages,
-            'game_rows': game_rows   # <-- added for raw data
+            'game_rows': game_rows
         }
 
     def list_available_files(self, sport: Optional[str] = None) -> Dict[str, Dict[int, List[str]]]:
-        """List all cached files: {sport: {year: [abbr1, abbr2, ...]}}"""
+        """
+        List all cached files: {sport: {year: [abbr1, abbr2, ...]}}
+        """
         result = {}
         sports = [sport] if sport else self.SUPPORTED_SPORTS
 
@@ -197,7 +230,19 @@ class CSVStatsService:
                 if year_dir.is_dir():
                     try:
                         year = int(year_dir.name)
-                        files = [f.stem.upper() for f in year_dir.glob("*.csv")]
+                        # Extract the base abbreviation from filenames like 'GNB_2025_stats.csv'
+                        # We store the original frontend abbreviation if possible, or just the base.
+                        # For simplicity, we'll list the file base names (without _year_stats).
+                        files = []
+                        for f in year_dir.glob("*.csv"):
+                            stem = f.stem  # e.g., 'GNB_2025_stats'
+                            # Remove the trailing '_2025_stats' to get the base
+                            parts = stem.rsplit('_', 2)
+                            if len(parts) == 3 and parts[1] == str(year) and parts[2] == 'stats':
+                                base = parts[0]
+                            else:
+                                base = stem  # fallback
+                            files.append(base)
                         if files:
                             years[year] = sorted(files)
                     except ValueError:
