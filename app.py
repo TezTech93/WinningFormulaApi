@@ -59,7 +59,7 @@ async def startup_event():
             logger.error("PostgreSQL connection failed")
 
 
-        from utils.seed_teams import seed_all_teams
+        from utils.seed_team import seed_all_teams
         
         db = next(get_db())
         try:
