@@ -18,18 +18,15 @@ class CSVStatsService:
 
     # Map frontend abbreviations (what the API receives) to actual file base names.
     # Example: the frontend sends 'GB' but the file is 'GNB_2025_stats.csv'
-    # Extend this dictionary for any other teams with non‑obvious file names.
     ABBR_MAPPING = {
         'nfl': {
             'GB': 'GNB',      # Green Bay Packers
-            # Add any other NFL overrides here
+            # Add other NFL overrides if needed
         },
         'nba': {
-            # Add any NBA overrides here
+            # Add NBA overrides if needed (e.g., if file names differ)
         },
-        'nhl': {
-            # Add any NHL overrides here
-        },
+        'nhl': {},
         'mlb': {},
         'ncaaf': {},
         'ncaab': {}
@@ -44,10 +41,7 @@ class CSVStatsService:
     # ---------- File Management ----------
 
     def _get_file_base(self, sport: str, abbr: str) -> str:
-        """
-        Return the actual file base name (without '_year_stats') after applying the mapping.
-        If no mapping exists, use the abbreviation as‑is (uppercase).
-        """
+        """Return the actual file base name (without '_year_stats') after applying the mapping."""
         sport_mapping = self.ABBR_MAPPING.get(sport, {})
         return sport_mapping.get(abbr.upper(), abbr.upper())
 
@@ -89,12 +83,29 @@ class CSVStatsService:
 
     # ---------- CSV Parsing ----------
 
+    def _find_header_row(self, rows) -> tuple:
+        """
+        Find the row that contains a known header column.
+        Known header columns: Rk, Gtm, Date, Opp, Rslt, Tm, Week, Day, etc.
+        Returns (header_row, header_index) or (None, -1).
+        """
+        known_headers = ['Rk', 'Gtm', 'Date', 'Opp', 'Rslt', 'Tm', 'FG', 'FGA', '3P', 'Week', 'Day', 'Location']
+        for idx, row in enumerate(rows):
+            if not row:
+                continue
+            # Check if any column in this row matches a known header (case-insensitive)
+            for cell in row:
+                cell_clean = cell.strip()
+                if cell_clean in known_headers or cell_clean.lower() in [h.lower() for h in known_headers]:
+                    return row, idx
+        return None, -1
+
     def _read_game_rows(self, sport: str, year: int, abbr: str) -> List[Dict[str, str]]:
         """
         Read the CSV file.
-        - Auto‑detects the header row (contains 'Week').
+        - Auto‑detects the header row using a list of known column names.
         - Skips any rows above the header (description).
-        - Skips any row where 'Week' is not an integer (e.g. totals row).
+        - Skips any row where the first column is not a number (e.g. totals row).
         Returns a list of dicts (column name -> value).
         """
         path = self.get_csv_path(sport, year, abbr)
@@ -104,41 +115,35 @@ class CSVStatsService:
         rows = []
         with open(path, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
-            header = None
-            non_empty_indices = []
+            all_rows = list(reader)
 
-            for row in reader:
-                if not row or len(row) == 0:
-                    continue
+        # Find the header row
+        header, header_idx = self._find_header_row(all_rows)
+        if header is None:
+            logger.error(f"Could not find header row in {path}")
+            return []
 
-                # Detect the header: look for a column containing 'week' (case-insensitive)
-                if header is None:
-                    for i, col in enumerate(row):
-                        if 'week' in col.lower():
-                            # This row is the header
-                            header = [col.strip() for col in row]
-                            # Store indices where the header is not empty
-                            non_empty_indices = [i for i, h in enumerate(header) if h.strip() != '']
-                            break
-                    if header is not None:
-                        continue  # skip the header row itself
+        # Clean header: strip whitespace, keep non‑empty columns
+        header = [col.strip() for col in header]
+        non_empty_indices = [i for i, h in enumerate(header) if h != '']
 
-                # Process data rows after header is set
-                if header is not None:
-                    # Skip rows where the first column (Week) is not a number
-                    try:
-                        int(row[0].strip())
-                    except (ValueError, IndexError):
-                        # This is likely a "Totals" row or a description row
-                        continue
+        # Process data rows (skip the header row itself)
+        for row in all_rows[header_idx + 1:]:
+            if not row:
+                continue
+            # Skip rows where the first column is not a number (totals row)
+            try:
+                float(row[0].strip())  # Try to convert to float; int works too
+            except (ValueError, IndexError):
+                continue  # this is likely a totals row or description
 
-                    # Build dict using only non‑empty header columns
-                    row_dict = {}
-                    for idx in non_empty_indices:
-                        if idx < len(row):
-                            col_name = header[idx].strip()
-                            row_dict[col_name] = row[idx].strip()
-                    rows.append(row_dict)
+            # Build dict using only non‑empty header columns
+            row_dict = {}
+            for idx in non_empty_indices:
+                if idx < len(row):
+                    col_name = header[idx]
+                    row_dict[col_name] = row[idx].strip()
+            rows.append(row_dict)
 
         return rows
 
@@ -167,7 +172,8 @@ class CSVStatsService:
         record = {'W': 0, 'L': 0, 'T': 0}
 
         for row in game_rows:
-            # Determine result (if 'Tm' and 'Opp' exist)
+            # Determine result if 'Tm' and 'Opp' exist (NFL, NBA, etc.)
+            # For NBA, the columns are 'Tm' and 'Opp' as well (from the sample)
             try:
                 tm = float(row.get('Tm', 0))
                 opp = float(row.get('Opp', 0))
@@ -213,9 +219,7 @@ class CSVStatsService:
         }
 
     def list_available_files(self, sport: Optional[str] = None) -> Dict[str, Dict[int, List[str]]]:
-        """
-        List all cached files: {sport: {year: [abbr1, abbr2, ...]}}
-        """
+        """List all cached files: {sport: {year: [abbr1, abbr2, ...]}}"""
         result = {}
         sports = [sport] if sport else self.SUPPORTED_SPORTS
 
@@ -230,18 +234,14 @@ class CSVStatsService:
                 if year_dir.is_dir():
                     try:
                         year = int(year_dir.name)
-                        # Extract the base abbreviation from filenames like 'GNB_2025_stats.csv'
-                        # We store the original frontend abbreviation if possible, or just the base.
-                        # For simplicity, we'll list the file base names (without _year_stats).
                         files = []
                         for f in year_dir.glob("*.csv"):
-                            stem = f.stem  # e.g., 'GNB_2025_stats'
-                            # Remove the trailing '_2025_stats' to get the base
+                            stem = f.stem  # e.g., 'LAL_2025_stats'
                             parts = stem.rsplit('_', 2)
                             if len(parts) == 3 and parts[1] == str(year) and parts[2] == 'stats':
                                 base = parts[0]
                             else:
-                                base = stem  # fallback
+                                base = stem
                             files.append(base)
                         if files:
                             years[year] = sorted(files)
