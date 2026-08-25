@@ -1,10 +1,13 @@
 # services/csv_stats_service.py
-import os
 import csv
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv() 
 
 logger = logging.getLogger(__name__)
 
