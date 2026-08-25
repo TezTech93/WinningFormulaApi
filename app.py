@@ -1097,6 +1097,151 @@ async def read_root():
         "database": "PostgreSQL"
     }
 
+@app.get("/privacy-policy", response_class=HTMLResponse)
+async def privacy_policy():
+    return HTMLResponse(content="""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy – Winners Formula</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #1a1a2e;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 40px 50px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 28px;
+            color: #A31D1D;
+            border-bottom: 3px solid #A31D1D;
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+        }
+        h2 {
+            font-size: 20px;
+            color: #A31D1D;
+            margin-top: 28px;
+            margin-bottom: 12px;
+        }
+        p {
+            margin-bottom: 14px;
+        }
+        ul, ol {
+            margin: 10px 0 18px 24px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .last-updated {
+            color: #666;
+            font-size: 14px;
+            margin-top: 30px;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 16px;
+        }
+        .contact {
+            background: #f0f2f5;
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 24px 20px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Privacy Policy</h1>
+        <p><strong>Last updated:</strong> August 2026</p>
+
+        <p>Winners Formula ("we", "our", "us") respects your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and related services (collectively, the "App").</p>
+
+        <h2>1. Information We Collect</h2>
+        <p>We collect information that you provide directly to us, such as when you create an account, update your profile, or contact us for support. This may include:</p>
+        <ul>
+            <li><strong>Account Data:</strong> Username, email address, password (hashed), and preferences.</li>
+            <li><strong>Usage Data:</strong> Information about how you interact with the App, including features used, time spent, and performance metrics.</li>
+            <li><strong>Device Data:</strong> Device type, operating system, unique device identifiers, and IP address (for analytics and security).</li>
+            <li><strong>User‑Generated Content:</strong> Any formulas, notes, or other data you choose to save within the App.</li>
+        </ul>
+        <p>We do <strong>not</strong> collect sensitive personal information (e.g., financial, health, or precise location) unless you explicitly provide it for a specific feature.</p>
+
+        <h2>2. How We Use Your Information</h2>
+        <p>We use the collected data for the following purposes:</p>
+        <ul>
+            <li>To provide, maintain, and improve the App’s functionality and user experience.</li>
+            <li>To authenticate your identity and manage your account.</li>
+            <li>To send you service‑related notifications (e.g., password changes, updates).</li>
+            <li>To analyze usage patterns and troubleshoot technical issues.</li>
+            <li>To comply with legal obligations and enforce our terms of service.</li>
+        </ul>
+        <p>We do <strong>not</strong> sell your personal data to third parties.</p>
+
+        <h2>3. How We Share Your Information</h2>
+        <p>We may share your information in the following situations:</p>
+        <ul>
+            <li><strong>Service Providers:</strong> With trusted third‑party vendors who assist us in hosting, analytics, and customer support (e.g., Firebase, Render). These parties are bound by data protection agreements.</li>
+            <li><strong>Legal Compliance:</strong> If required by law, court order, or governmental regulation, or to protect the rights and safety of our users and the public.</li>
+            <li><strong>Business Transfers:</strong> In connection with a merger, acquisition, or sale of assets, where your data would be transferred as part of the transaction.</li>
+        </ul>
+
+        <h2>4. Data Security</h2>
+        <p>We implement industry‑standard security measures, including encryption (HTTPS/TLS) and secure storage, to protect your data from unauthorized access, alteration, or destruction. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.</p>
+
+        <h2>5. Your Rights and Choices</h2>
+        <p>Depending on your jurisdiction, you may have the following rights regarding your personal data:</p>
+        <ul>
+            <li><strong>Access:</strong> Request a copy of the data we hold about you.</li>
+            <li><strong>Correction:</strong> Update or correct inaccurate data.</li>
+            <li><strong>Deletion:</strong> Request that we delete your account and associated data.</li>
+            <li><strong>Opt‑out:</strong> Unsubscribe from non‑essential communications.</li>
+        </ul>
+        <p>To exercise any of these rights, please contact us using the details in Section 8.</p>
+
+        <h2>6. Children’s Privacy</h2>
+        <p>Our App is not intended for individuals under the age of 13. We do not knowingly collect personal information from children under 13. If you believe we have inadvertently collected such data, please contact us so we can delete it.</p>
+
+        <h2>7. Third‑Party Links</h2>
+        <p>The App may contain links to external websites (e.g., our support portal or social media). We are not responsible for the privacy practices of these third‑party sites.</p>
+
+        <h2>8. Contact Us</h2>
+        <div class="contact">
+            <p>If you have any questions, concerns, or requests regarding this Privacy Policy, please reach out to us at:</p>
+            <p><strong>Email:</strong> privacy@winnersformula.com<br />
+            <strong>Address:</strong> Winners Formula, 123 Main Street, Suite 100, Detroit, MI 48201, USA</p>
+        </div>
+        <p>We will respond to all legitimate requests within 30 days.</p>
+
+        <h2>9. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by posting the new version on this page and updating the "Last updated" date. We encourage you to review this policy periodically.</p>
+
+        <div class="last-updated">
+            &copy; 2026 Winners Formula. All rights reserved.
+        </div>
+    </div>
+</body>
+</html>
+    """)
+
 from core.database import get_table_schema_json, get_all_schemas_json, get_table_columns
 
 @app.get("/admin/schema")
