@@ -1029,21 +1029,33 @@ async def add_manual_gamelines_bulk_api(
     games_data: List[GamelineInput] = Body(...),
     db: Session = Depends(get_db)
 ):
-    """API endpoint to add multiple gamelines manually from JSON data"""
     if sport not in sports_manager.SUPPORTED_SPORTS:
-        raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
+        raise HTTPException(400, f"Unsupported sport: {sport}")
     
-    if not games_data:
-        raise HTTPException(status_code=400, detail="No games provided")
-    
-    # Convert to dict list
-    games_dict = [game.dict() for game in games_data]
+    games_dict = []
+    for game in games_data:
+        game_dict = game.dict()
+        # Resolve team names to IDs
+        if isinstance(game_dict['home_team_id'], str):
+            team = sports_manager.get_team_by_name(sport, game_dict['home_team_id'], db)
+            if not team:
+                # Also try abbreviation
+                team = sports_manager.get_team_by_abbr(sport, game_dict['home_team_id'], db)
+            if not team:
+                raise HTTPException(400, f"Team not found: {game_dict['home_team_id']}")
+            game_dict['home_team_id'] = team.id
+        if isinstance(game_dict['away_team_id'], str):
+            team = sports_manager.get_team_by_name(sport, game_dict['away_team_id'], db)
+            if not team:
+                team = sports_manager.get_team_by_abbr(sport, game_dict['away_team_id'], db)
+            if not team:
+                raise HTTPException(400, f"Team not found: {game_dict['away_team_id']}")
+            game_dict['away_team_id'] = team.id
+        games_dict.append(game_dict)
     
     result = sports_manager.manual_add_gamelines_bulk(sport, db, games_dict)
-    
     if result.get('error'):
-        raise HTTPException(status_code=400, detail=result['error'])
-    
+        raise HTTPException(400, detail=result['error'])
     return result
 
 # ============ Gamelines Endpoints ============
