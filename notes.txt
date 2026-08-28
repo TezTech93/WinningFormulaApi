@@ -1,0 +1,21 @@
+#Backend
+1.Add raw html copy of gamelines as an upload route option
+2.Add players/coaches names for all sports
+3.All player/coaches stats
+4.Add advanced stats for all sports
+
+#Frontend-Stats
+1.///Opponent name should be in game row 
+2.Stats should generate based on selected available option (currently only the gamelog)
+
+#Frontend-FormulasComponent
+1.Make creating a predictive formula easier for the average person to understand,(ideas):
+    1. Make it a game mode kind of feel 
+        i.light up different sections like offense,defense stats or make their colors be inverted
+        ii.put it into specific parameters like build the best metric/ranking etc. have them include what they think matters and to what degree i.e (fgp:0.08,fgm:0.035)
+        iii.set limits and uniformity to simulations so user's can only create formulas that are relatively repeatable and reliable and make since(not wildly random),also leaving enough room for some level of randomness (like a madden/2k simulation)
+        iiii.save predictions of a simulation to user localStorage to be compared to actual result once event has finalized, use that data to determine the reliability of each given formula and have each formula predict for either moneyline, spread or total.
+        iiiii.make the user data downloadable and shareable
+        iiiiii.keep the general overall ui of the app while making it more like google docs/sheets excel more traditional style for the formulaic components of the app with child components if necessary to fully utilize the better ideas
+        iiiiiii.for the formulas calculator have the current calculator generated based on available option for example I plan on adding advanced metrics later or even user metrics for given sports
+
