@@ -1,13 +1,10 @@
 # utils/seed_teams.py
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from core.database import SessionLocal
 from models.team import Team
 
 # Import team lists from the sports modules
-# These files should exist at: sports/{sport}/{sport}_teams.py
-# Each file must define a variable named exactly as the sport (e.g., nfl_teams)
 try:
     from sports.nfl.nfl_teams import nfl_teams
 except ImportError:
@@ -44,7 +41,6 @@ except ImportError:
     ncaaf_teams = []
     logging.warning("Could not import ncaaf_teams from sports.ncaaf.ncaaf_teams")
 
-
 logger = logging.getLogger(__name__)
 
 # Map sport names to their team lists
@@ -61,16 +57,9 @@ ALL_TEAMS = {
 def seed_teams(db: Session, sport: str = None):
     """
     Seed teams for a specific sport or all sports.
-
-    Args:
-        db: SQLAlchemy session
-        sport: Optional sport name ('nfl', 'nba', 'mlb', 'nhl', 'ncaab', 'ncaaf')
-
-    Returns:
-        dict: Summary of seeded teams
+    Stores full team name (city + teamName) when available.
     """
     results = {}
-
     sports_to_seed = [sport] if sport else ALL_TEAMS.keys()
 
     for sport_name in sports_to_seed:
@@ -88,15 +77,22 @@ def seed_teams(db: Session, sport: str = None):
         skipped = 0
 
         for team_info in team_data:
-            # Handle both 'abbreviation' and 'abv' keys
+            # Get abbreviation
             abbr = team_info.get('abbreviation') or team_info.get('abv')
             if not abbr:
                 logger.warning(f"Skipping team with no abbreviation: {team_info}")
                 continue
 
-            # Handle both 'name' and 'teamName' keys
-            name = team_info.get('name') or team_info.get('teamName')
-            if not name:
+            # Build full name: combine city and teamName if both exist
+            city = team_info.get('city', '').strip()
+            team_name = team_info.get('teamName') or team_info.get('name', '').strip()
+            if city and team_name:
+                full_name = f"{city} {team_name}"
+            elif team_name:
+                full_name = team_name
+            elif city:
+                full_name = city
+            else:
                 logger.warning(f"Skipping team with no name: {team_info}")
                 continue
 
@@ -107,17 +103,22 @@ def seed_teams(db: Session, sport: str = None):
             ).first()
 
             if existing:
+                # Optionally update name if it's different (e.g., after seeding fix)
+                if existing.name != full_name:
+                    existing.name = full_name
+                    logger.info(f"Updated team name: {existing.abbreviation} -> {full_name}")
+                    db.commit()
                 skipped += 1
                 continue
 
             # Create new team
             team = Team(
                 sport=sport_name,
-                name=name,
+                name=full_name,
                 abbreviation=abbr.upper(),
                 conference=team_info.get('conference'),
                 division=team_info.get('division'),
-                city=team_info.get('city'),
+                city=city,
                 state=team_info.get('state'),
                 stadium=team_info.get('stadium'),
             )
@@ -161,7 +162,6 @@ def get_team_mapping(db: Session, sport: str) -> dict:
 
 
 if __name__ == "__main__":
-    # Run directly to seed all teams
     db = SessionLocal()
     try:
         print("Seeding teams...")
