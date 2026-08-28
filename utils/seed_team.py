@@ -6,37 +6,37 @@ from models.team import Team
 
 # Import team lists from the sports modules
 try:
-    from sports.nfl.nfl_teams import nfl_teams
+    from Sports.nfl.nfl_teams import nfl_teams
 except ImportError:
     nfl_teams = []
     logging.warning("Could not import nfl_teams from sports.nfl.nfl_teams")
 
 try:
-    from sports.nba.nba_teams import nba_teams
+    from Sports.nba.nba_teams import nba_teams
 except ImportError:
     nba_teams = []
     logging.warning("Could not import nba_teams from sports.nba.nba_teams")
 
 try:
-    from sports.mlb.mlb_teams import mlb_teams
+    from Sports.mlb.mlb_teams import mlb_teams
 except ImportError:
     mlb_teams = []
     logging.warning("Could not import mlb_teams from sports.mlb.mlb_teams")
 
 try:
-    from sports.nhl.nhl_teams import nhl_teams
+    from Sports.nhl.nhl_teams import nhl_teams
 except ImportError:
     nhl_teams = []
     logging.warning("Could not import nhl_teams from sports.nhl.nhl_teams")
 
 try:
-    from sports.ncaab.ncaab_teams import ncaab_teams
+    from Sports.ncaab.ncaab_teams import ncaab_teams
 except ImportError:
     ncaab_teams = []
     logging.warning("Could not import ncaab_teams from sports.ncaab.ncaab_teams")
 
 try:
-    from sports.ncaaf.ncaaf_teams import ncaaf_teams
+    from Sports.ncaaf.ncaaf_teams import ncaaf_teams
 except ImportError:
     ncaaf_teams = []
     logging.warning("Could not import ncaaf_teams from sports.ncaaf.ncaaf_teams")
