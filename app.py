@@ -1023,6 +1023,9 @@ async def add_manual_gameline_api(
     
     return result
 
+from utils.team_resolver import get_team_id
+from Sports.ncaaf.ncaaf_teams import ncaaf_teams  # for abbreviation list
+
 @app.post("/{sport}/gamelines/manual/bulk")
 async def add_manual_gamelines_bulk_api(
     sport: str,
@@ -1035,6 +1038,12 @@ async def add_manual_gamelines_bulk_api(
     if not games_data:
         raise HTTPException(400, detail="No games provided")
     
+    # For sport, we may need the team list for abbreviation mapping
+    team_list = None
+    if sport == "ncaaf":
+        team_list = ncaaf_teams  # import from your file
+    # Add other sports similarly
+
     games_dict = []
     errors = []
     
@@ -1042,33 +1051,31 @@ async def add_manual_gamelines_bulk_api(
         game_dict = game.dict()
         try:
             # Resolve home team
-            home_id = game_dict['home_team_id']
-            if isinstance(home_id, str):
-                team = sports_manager.get_team_by_name(sport, home_id, db)
-                if not team:
-                    # Try abbreviation
-                    team = sports_manager.get_team_by_abbr(sport, home_id, db)
-                if not team:
-                    raise ValueError(f"Home team not found: {home_id}")
-                # Handle both dict and object
-                game_dict['home_team_id'] = team['id'] if isinstance(team, dict) else team.id
+            home_name = game_dict['home_team_id']
+            if isinstance(home_name, str):
+                home_id = get_team_id(sport, home_name, db, team_list)
+                if home_id is None:
+                    raise ValueError(f"Home team not found: {home_name}")
+                game_dict['home_team_id'] = home_id
+            else:
+                # Already int, keep as is
+                pass
             
             # Resolve away team
-            away_id = game_dict['away_team_id']
-            if isinstance(away_id, str):
-                team = sports_manager.get_team_by_name(sport, away_id, db)
-                if not team:
-                    team = sports_manager.get_team_by_abbr(sport, away_id, db)
-                if not team:
-                    raise ValueError(f"Away team not found: {away_id}")
-                game_dict['away_team_id'] = team['id'] if isinstance(team, dict) else team.id
+            away_name = game_dict['away_team_id']
+            if isinstance(away_name, str):
+                away_id = get_team_id(sport, away_name, db, team_list)
+                if away_id is None:
+                    raise ValueError(f"Away team not found: {away_name}")
+                game_dict['away_team_id'] = away_id
+            else:
+                pass
             
             games_dict.append(game_dict)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
     
     if errors:
-        # If all failed, return error
         return {
             "message": f"Failed to resolve teams for {len(errors)} games",
             "errors": errors,
@@ -1076,7 +1083,6 @@ async def add_manual_gamelines_bulk_api(
             "added": 0
         }
     
-    # Pass the resolved dicts to the manager
     result = sports_manager.manual_add_gamelines_bulk(sport, db, games_dict)
     if result.get('error'):
         raise HTTPException(400, detail=result['error'])
