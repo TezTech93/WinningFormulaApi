@@ -1032,30 +1032,55 @@ async def add_manual_gamelines_bulk_api(
     if sport not in sports_manager.SUPPORTED_SPORTS:
         raise HTTPException(400, f"Unsupported sport: {sport}")
     
-    games_dict = []
-    for game in games_data:
-        game_dict = game.dict()
-        # Resolve team names to IDs
-        if isinstance(game_dict['home_team_id'], str):
-            team = sports_manager.get_team_by_name(sport, game_dict['home_team_id'], db)
-            if not team:
-                # Also try abbreviation
-                team = sports_manager.get_team_by_abbr(sport, game_dict['home_team_id'], db)
-            if not team:
-                raise HTTPException(400, f"Team not found: {game_dict['home_team_id']}")
-            game_dict['home_team_id'] = team.id
-        if isinstance(game_dict['away_team_id'], str):
-            team = sports_manager.get_team_by_name(sport, game_dict['away_team_id'], db)
-            if not team:
-                team = sports_manager.get_team_by_abbr(sport, game_dict['away_team_id'], db)
-            if not team:
-                raise HTTPException(400, f"Team not found: {game_dict['away_team_id']}")
-            game_dict['away_team_id'] = team.id
-        games_dict.append(game_dict)
+    if not games_data:
+        raise HTTPException(400, detail="No games provided")
     
+    games_dict = []
+    errors = []
+    
+    for idx, game in enumerate(games_data):
+        game_dict = game.dict()
+        try:
+            # Resolve home team
+            home_id = game_dict['home_team_id']
+            if isinstance(home_id, str):
+                team = sports_manager.get_team_by_name(sport, home_id, db)
+                if not team:
+                    # Try abbreviation
+                    team = sports_manager.get_team_by_abbr(sport, home_id, db)
+                if not team:
+                    raise ValueError(f"Home team not found: {home_id}")
+                # Handle both dict and object
+                game_dict['home_team_id'] = team['id'] if isinstance(team, dict) else team.id
+            
+            # Resolve away team
+            away_id = game_dict['away_team_id']
+            if isinstance(away_id, str):
+                team = sports_manager.get_team_by_name(sport, away_id, db)
+                if not team:
+                    team = sports_manager.get_team_by_abbr(sport, away_id, db)
+                if not team:
+                    raise ValueError(f"Away team not found: {away_id}")
+                game_dict['away_team_id'] = team['id'] if isinstance(team, dict) else team.id
+            
+            games_dict.append(game_dict)
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e)})
+    
+    if errors:
+        # If all failed, return error
+        return {
+            "message": f"Failed to resolve teams for {len(errors)} games",
+            "errors": errors,
+            "total": len(games_data),
+            "added": 0
+        }
+    
+    # Pass the resolved dicts to the manager
     result = sports_manager.manual_add_gamelines_bulk(sport, db, games_dict)
     if result.get('error'):
         raise HTTPException(400, detail=result['error'])
+    
     return result
 
 # ============ Gamelines Endpoints ============
