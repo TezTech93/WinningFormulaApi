@@ -85,12 +85,14 @@ app.include_router(formulas.router)
 app.include_router(stats.router)
 
 # ============ Pydantic Models for Manual Input ============
+from typing import Union
+
 class GamelineInput(BaseModel):
     game_id: Optional[str] = None
     game_date: str  
     start_time: Optional[str] = None
-    home_team_id: int  
-    away_team_id: int  
+    home_team_id: Union[int, str]  
+    away_team_id: Union[int, str] 
     home_abbr: Optional[str] = None
     away_abbr: Optional[str] = None
     home_ml: Optional[int] = None
