@@ -1465,6 +1465,8 @@ async def seed_all_teams(
     result = sports_manager.seed_all_teams(db)
     return result
 
+from models.team import Team
+
 @app.get("/debug/ncaaf/{name}")
 async def debug_team(name: str, db: Session = Depends(get_db)):
     team = db.query(Team).filter(Team.sport == "ncaaf", Team.name.ilike(name)).first()
