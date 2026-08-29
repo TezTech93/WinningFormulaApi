@@ -21,6 +21,7 @@ class Team(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     stats = relationship("TeamStats", back_populates="team", cascade="all, delete-orphan", lazy="select")
+    players = relationship("Player", back_populates="team")
     
     def to_dict(self):
         """Convert team to dictionary for JSON responses"""
