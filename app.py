@@ -1354,6 +1354,19 @@ async def privacy_policy():
 </html>
     """)
 
+@app.get("/{sport}/gamelines/all")
+async def get_all_gamelines(sport: str, db: Session = Depends(get_db)):
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(400, detail=f"Unsupported sport: {sport}")
+    
+    games = db.query(Gameline).filter(Gameline.sport == sport).order_by(Gameline.game_date).all()
+    return {
+        "sport": sport,
+        "count": len(games),
+        "games": [g.to_dict() for g in games],
+        "source": "database"
+    }
+
 from core.database import get_table_schema_json, get_all_schemas_json, get_table_columns
 
 @app.get("/admin/schema")
