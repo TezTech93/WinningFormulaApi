@@ -82,6 +82,15 @@ def get_team_id(sport: str, name: str, db: Session, team_list=None) -> int:
         "florida state seminoles": "Florida State Seminoles",
         "east texas a&m lions": "East Texas A&M Lions",
         # Add more as you discover
+        "nc state wolfpack": "North Carolina State Wolfpack",
+        "tarleton state texans": "Tarleton State Texans",
+        "ball state cardinals": "Ball State Cardinals",
+        "kansas state wildcats": "Kansas State Wildcats",
+        "lsu tigers": "LSU Tigers",
+        "san diego state aztecs": "San Diego State Aztecs",
+        "ualbany great danes": "UAlbany Great Danes",
+        "new haven chargers": "New Haven Chargers",
+        "west georgia wolves": "West Georgia Wolves",
     }
 
     # Check override using normalized name
