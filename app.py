@@ -1038,6 +1038,61 @@ async def add_manual_gamelines_bulk_api(
     if not games_data:
         raise HTTPException(400, detail="No games provided")
     
+    # Load team resolver
+    team_list = None
+    if sport == "ncaaf":
+        from Sports.ncaaf.ncaaf_teams import ncaaf_teams
+        team_list = ncaaf_teams
+    from utils.team_resolver import get_team_id
+    
+    added = 0
+    errors = []
+    
+    for idx, game in enumerate(games_data):
+        try:
+            game_dict = game.dict()
+            
+            # Resolve home team
+            home_val = game_dict.get('home_team_id')
+            if isinstance(home_val, str):
+                home_id = get_team_id(sport, home_val, db, team_list)
+                if home_id is None:
+                    raise ValueError(f"Home team not found: {home_val}")
+                game_dict['home_team_id'] = home_id
+            
+            # Resolve away team
+            away_val = game_dict.get('away_team_id')
+            if isinstance(away_val, str):
+                away_id = get_team_id(sport, away_val, db, team_list)
+                if away_id is None:
+                    raise ValueError(f"Away team not found: {away_val}")
+                game_dict['away_team_id'] = away_id
+            
+            # Generate unique game_id if not provided
+            if not game_dict.get('game_id'):
+                game_dict['game_id'] = f"{sport}_bulk_{int(time.time())}_{idx}"
+            
+            # Use the manager to add one game (it will commit)
+            result = sports_manager.manual_add_gameline(sport, db, game_dict)
+            if result.get('error'):
+                raise Exception(result['error'])
+            added += 1
+            
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e), "game": game_dict if 'game_dict' in locals() else {}})
+    
+    return {
+        "message": f"Added {added} games out of {len(games_data)} total",
+        "added": added,
+        "errors": errors,
+        "total": len(games_data)
+    }
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(400, f"Unsupported sport: {sport}")
+    
+    if not games_data:
+        raise HTTPException(400, detail="No games provided")
+    
     # Load team list for this sport (for abbreviation mapping)
     team_list = None
     if sport == "ncaaf":
