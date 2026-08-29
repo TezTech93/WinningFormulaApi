@@ -77,12 +77,13 @@ async def startup_event():
         logger.error(f"Database initialization error: {e}")
 
 # Import routers
-from routers import auth, users, formulas, stats
+from routers import auth, users, formulas, stats, players
 
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(formulas.router)
 app.include_router(stats.router)
+app.include_router(players.router)
 
 # ============ Pydantic Models for Manual Input ============
 from typing import Union
@@ -1302,7 +1303,7 @@ async def upload_gamelines(
         "total": len(games),
         "result": result
     }
-    
+
 # ============ Gamelines Endpoints ============
 @app.get("/{sport}/gamelines")
 async def get_sport_gamelines(
