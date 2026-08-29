@@ -12,7 +12,7 @@ async def get_players(
     team_id: int = Query(None, description="Filter by team ID"),
     search: str = Query(None, description="Search by name"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    #current_user = Depends(get_current_user)
 ):
     query = db.query(Player).filter(Player.sport == sport)
     if team_id:
