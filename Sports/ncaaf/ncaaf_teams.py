@@ -243,5 +243,10 @@ ncaaf_teams = [
     # Add these at the end
     {'city':'New Haven', 'teamName':'Chargers', 'abv':'NEWH'},
     {'city':'UAlbany', 'teamName':'Great Danes', 'abv':'UALB'},
-    {'city':'West Georgia', 'teamName':'Wolves', 'abv':'UWG'}
+    {'city':'West Georgia', 'teamName':'Wolves', 'abv':'UWG'},
+    {'city':'Merrimack', 'teamName':'Warriors', 'abv':'MERR'},
+    {'city':'Utah', 'teamName':'Utes', 'abv':'UTAH'},
+    {'city':'UT Rio Grande Valley', 'teamName':'Vaqueros', 'abv':'UTRGV'},
+    {'city':'Mississippi Valley State', 'teamName':'Delta Devils', 'abv':'MVSU'},
+    {'city':'Wisconsin', 'teamName':'Badgers', 'abv':'WIS'},
 ]
