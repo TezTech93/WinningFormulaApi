@@ -1212,6 +1212,97 @@ async def add_manual_gamelines_bulk_api(
     
     return result
 
+
+from fastapi import UploadFile, File, Form, Body
+from services.text_odds_parser import parse_games_from_text
+from utils.team_resolver import get_team_id
+import time
+
+@app.post("/admin/gamelines/upload")
+async def upload_gamelines(
+    sport: str = Query(..., description="Sport: nfl, nba, mlb, nhl, ncaaf, ncaab"),
+    file: Optional[UploadFile] = File(None),
+    text: Optional[str] = Body(None, media_type="text/plain"),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload gamelines either as a text file or as a plain text string.
+    - Use 'file' for multipart file upload.
+    - Use 'text' for JSON request with raw text.
+    """
+    if sport not in sports_manager.SUPPORTED_SPORTS:
+        raise HTTPException(400, f"Unsupported sport: {sport}")
+
+    # Get the raw text from either file or body
+    content = None
+    if file:
+        content = await file.read()
+        try:
+            text_content = content.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(400, "File must be UTF-8 encoded text")
+    elif text:
+        text_content = text
+    else:
+        raise HTTPException(400, "Either 'file' or 'text' must be provided")
+
+    # Parse the text into game dicts (team names as strings)
+    games = parse_games_from_text(text_content)
+    if not games:
+        raise HTTPException(400, "No games found in the provided text.")
+
+    # Load team list for this sport
+    team_list = None
+    try:
+        module = __import__(f"Sports.{sport}.{sport}_teams", fromlist=[f"{sport}_teams"])
+        team_list = getattr(module, f"{sport}_teams")
+    except (ImportError, AttributeError):
+        pass  # If no team list, resolver will still try DB
+
+    # Resolve team names to IDs
+    valid_games = []
+    errors = []
+    for idx, game in enumerate(games):
+        try:
+            home_name = game['home_team_id']
+            away_name = game['away_team_id']
+            home_id = get_team_id(sport, home_name, db, team_list)
+            away_id = get_team_id(sport, away_name, db, team_list)
+            if home_id is None:
+                raise ValueError(f"Home team not found: {home_name}")
+            if away_id is None:
+                raise ValueError(f"Away team not found: {away_name}")
+            game['home_team_id'] = home_id
+            game['away_team_id'] = away_id
+            # Generate unique game_id
+            game['game_id'] = f"{sport}_upload_{int(time.time())}_{idx}"
+            # Set sport explicitly
+            game['sport'] = sport
+            valid_games.append(game)
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e), "game": game})
+
+    if not valid_games:
+        return {
+            "message": "No valid games could be resolved",
+            "errors": errors,
+            "total": len(games),
+            "added": 0
+        }
+
+    # Bulk insert using the existing manager
+    result = sports_manager.manual_add_gamelines_bulk(sport, db, valid_games)
+    if result.get('error'):
+        raise HTTPException(400, detail=result['error'])
+
+    return {
+        "message": f"Added {len(valid_games)} games out of {len(games)} total",
+        "added": len(valid_games),
+        "errors": errors,
+        "total": len(games),
+        "result": result
+    }
+    
 # ============ Gamelines Endpoints ============
 @app.get("/{sport}/gamelines")
 async def get_sport_gamelines(
