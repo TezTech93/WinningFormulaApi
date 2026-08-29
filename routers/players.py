@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from core.database import get_db
 from core.dependencies import get_current_user
-from models.player import Player
+from models.players import Player
 
 router = APIRouter(prefix="/players", tags=["players"])
 

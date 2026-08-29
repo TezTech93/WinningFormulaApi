@@ -1,6 +1,6 @@
 import csv, requests
 from core.database import SessionLocal
-from models.player import Player
+from models.players import Player
 from models.team import Team
 
 def import_nfl_players():
