@@ -239,5 +239,9 @@ ncaaf_teams = [
     {'city':'Wyoming','teamName':'Cowboys','abv':'WYO'},
     {'city':'Xavier','teamName':'Musketeers','abv':'XAV'},
     {'city':'Yale','teamName':'Bulldogs','abv':'YALE'},
-    {'city':'Youngstown State','teamName':'Penguins','abv':'YSU'}
+    {'city':'Youngstown State','teamName':'Penguins','abv':'YSU'},
+    # Add these at the end
+    {'city':'New Haven', 'teamName':'Chargers', 'abv':'NEWH'},
+    {'city':'UAlbany', 'teamName':'Great Danes', 'abv':'UALB'},
+    {'city':'West Georgia', 'teamName':'Wolves', 'abv':'UWG'}
 ]
