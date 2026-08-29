@@ -1025,6 +1025,7 @@ async def add_manual_gameline_api(
 
 from utils.team_resolver import get_team_id
 from Sports.ncaaf.ncaaf_teams import ncaaf_teams  # for abbreviation list
+import time
 
 @app.post("/{sport}/gamelines/manual/bulk")
 async def add_manual_gamelines_bulk_api(
