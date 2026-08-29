@@ -1465,6 +1465,22 @@ async def seed_all_teams(
     result = sports_manager.seed_all_teams(db)
     return result
 
+@app.get("/debug/ncaaf/{name}")
+async def debug_team(name: str, db: Session = Depends(get_db)):
+    team = db.query(Team).filter(Team.sport == "ncaaf", Team.name.ilike(name)).first()
+    if team:
+        return {"found": True, "id": team.id, "name": team.name, "abbr": team.abbreviation}
+    return {"found": False}
+
+@app.get("/debug/ncaaf/all")
+async def debug_all_teams(db: Session = Depends(get_db)):
+    """Return all NCAAF teams from the database to debug name mismatches."""
+    teams = db.query(Team).filter(Team.sport == "ncaaf").order_by(Team.name).all()
+    return {
+        "count": len(teams),
+        "teams": [{"id": t.id, "name": t.name, "abbr": t.abbreviation} for t in teams]
+    }
+
 @app.get("/teams/{sport}/stats/{team_id}")
 async def get_team_stats(
     sport: str,
