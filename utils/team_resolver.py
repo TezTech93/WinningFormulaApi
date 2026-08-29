@@ -2,87 +2,78 @@
 import unicodedata
 from sqlalchemy.orm import Session
 from models.team import Team
-from Sports.ncaaf.ncaaf_teams import ncaaf_teams  # for abbreviation mapping
 
 def normalize_string(s: str) -> str:
     """Remove accents, convert to lowercase, strip extra spaces."""
     s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
     return s.lower().strip()
 
-def get_team_id(sport: str, name: str, db: Session, team_list=None) -> int:
+def get_team_id(sport: str, search_name: str, db: Session, team_list=None) -> int:
     """
     Resolve a team name to its database ID using multiple strategies.
-    team_list is optional – if provided, it's a list of dicts with 'abv' (abbreviation) and 'teamName'/'city'.
+    team_list is a list of dicts with keys: city, teamName, abv.
     """
-    if not name:
+    if not search_name:
         return None
 
-    # 1. Exact match (case-insensitive)
-    team = db.query(Team).filter(
-        Team.sport == sport,
-        Team.name.ilike(name)
-    ).first()
-    if team:
-        return team.id
-
-    # 2. Normalize (remove accents, lower)
-    norm_name = normalize_string(name)
+    norm_search = normalize_string(search_name)
     teams = db.query(Team).filter(Team.sport == sport).all()
+
+    # 1. Exact case-insensitive match
     for t in teams:
-        if normalize_string(t.name) == norm_name:
+        if t.name.lower() == search_name.lower():
             return t.id
 
-    # 3. Partial match (if one contains the other)
+    # 2. Normalized exact match
     for t in teams:
-        if norm_name in normalize_string(t.name) or normalize_string(t.name) in norm_name:
-            # Prefer the shorter if it's a substring, but we'll take the first match
+        if normalize_string(t.name) == norm_search:
             return t.id
 
-    # 4. Abbreviation lookup (from the team list)
+    # 3. Partial match (substring)
+    for t in teams:
+        t_norm = normalize_string(t.name)
+        if norm_search in t_norm or t_norm in norm_search:
+            return t.id
+
+    # 4. Match by city + teamName using the team_list
+    if team_list:
+        # Try to find a team_info where city+teamName forms the search name
+        for team_info in team_list:
+            city = team_info.get('city', '').strip()
+            team_name = team_info.get('teamName', '').strip()
+            full_name = f"{city} {team_name}".strip()
+            if normalize_string(full_name) == norm_search:
+                # Now find this team in DB by abbreviation or full name
+                abv = team_info.get('abv', '').upper()
+                t = db.query(Team).filter(Team.sport == sport, Team.abbreviation == abv).first()
+                if t:
+                    return t.id
+                # Fallback: search by name
+                t = db.query(Team).filter(Team.sport == sport, Team.name == full_name).first()
+                if t:
+                    return t.id
+
+    # 5. Match by city alone (if search contains city)
+    if team_list:
+        for team_info in team_list:
+            city = team_info.get('city', '').strip()
+            if city and normalize_string(city) in norm_search:
+                abv = team_info.get('abv', '').upper()
+                t = db.query(Team).filter(Team.sport == sport, Team.abbreviation == abv).first()
+                if t:
+                    return t.id
+
+    # 6. Abbreviation from team_list
     if team_list:
         for team_info in team_list:
             abv = team_info.get('abv', '').lower()
-            if abv and (abv == norm_name or abv in norm_name or norm_name in abv):
-                # Find the team in DB by abbreviation
-                team = db.query(Team).filter(Team.sport == sport, Team.abbreviation == abv.upper()).first()
-                if team:
-                    return team.id
+            if abv and abv in norm_search:
+                t = db.query(Team).filter(Team.sport == sport, Team.abbreviation == abv.upper()).first()
+                if t:
+                    return t.id
 
-    # 5. Manual override for common mismatches
+    # 7. Direct overrides (manual mapping)
     overrides = {
-        "san jose state spartans": "San Jose State Spartans",
-        "san josé state spartans": "San Jose State Spartans",
-        "albany great danes": "UAlbany Great Danes",
-        "ualbany great danes": "UAlbany Great Danes",
-        "app state mountaineers": "Appalachian State Mountaineers",
-        "ul monroe warhawks": "Louisiana-Monroe Warhawks",
-        "louisiana-monroe warhawks": "UL Monroe Warhawks",  # both directions
-        "lsu tigers": "LSU Tigers",
-        "smu mustangs": "SMU Mustangs",
-        "uc davis aggies": "UC Davis Aggies",
-        "ut rio grande valley vaqueros": "UTRGV Vaqueros",  # adjust if needed
-        "se louisiana lions": "Southeastern Louisiana Lions",
-        "mcneese cowboys": "McNeese State Cowboys",
-        "nicholls colonels": "Nicholls State Colonels",
-        "tennessee tech golden eagles": "Tennessee Tech Golden Eagles",
-        "arkansas-pine bluff golden lions": "Arkansas-Pine Bluff Golden Lions",
-        "massachusetts minutenmen": "UMass Minutemen",
-        "minutemen": "UMass Minutemen",
-        "merrimack warriors": "Merrimack Warriors",  # should match
-        "stonehill skyhawks": "Stonehill Skyhawks",
-        "idaho state bengals": "Idaho State Bengals",
-        "north alabama lions": "North Alabama Lions",
-        "tarleton state texans": "Tarleton State Texans",
-        "utah tech trailblazers": "Utah Tech Trailblazers",
-        "hawai'i rainbow warriors": "Hawaii Rainbow Warriors",
-        "pittsburgh panthers": "Pittsburgh Panthers",
-        "penn state nittany lions": "Penn State Nittany Lions",
-        "kentucky wildcats": "Kentucky Wildcats",
-        "wisonsin badgers": "Wisconsin Badgers",
-        "florida state seminoles": "Florida State Seminoles",
-        "east texas a&m lions": "East Texas A&M Lions",
-        # Add more as you discover
-        "nc state wolfpack": "North Carolina State Wolfpack",
         "tarleton state texans": "Tarleton State Texans",
         "ball state cardinals": "Ball State Cardinals",
         "kansas state wildcats": "Kansas State Wildcats",
@@ -91,19 +82,17 @@ def get_team_id(sport: str, name: str, db: Session, team_list=None) -> int:
         "ualbany great danes": "UAlbany Great Danes",
         "new haven chargers": "New Haven Chargers",
         "west georgia wolves": "West Georgia Wolves",
+        "nc state wolfpack": "North Carolina State Wolfpack",
     }
+    if norm_search in overrides:
+        target_name = overrides[norm_search]
+        t = db.query(Team).filter(Team.sport == sport, Team.name.ilike(target_name)).first()
+        if t:
+            return t.id
 
-    # Check override using normalized name
-    key = normalize_string(name)
-    if key in overrides:
-        override_name = overrides[key]
-        team = db.query(Team).filter(Team.sport == sport, Team.name.ilike(override_name)).first()
-        if team:
-            return team.id
+    # 8. Try abbreviation directly from DB
+    t = db.query(Team).filter(Team.sport == sport, Team.abbreviation.ilike(search_name)).first()
+    if t:
+        return t.id
 
-    # 6. Try to find by abbreviation directly from DB
-    abbr_team = db.query(Team).filter(Team.sport == sport, Team.abbreviation.ilike(name)).first()
-    if abbr_team:
-        return abbr_team.id
-
-    return None  # Not found
+    return None
