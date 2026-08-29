@@ -1354,6 +1354,8 @@ async def privacy_policy():
 </html>
     """)
 
+from models.gamelines import Gameline
+
 @app.get("/{sport}/gamelines/all")
 async def get_all_gamelines(sport: str, db: Session = Depends(get_db)):
     if sport not in sports_manager.SUPPORTED_SPORTS:
