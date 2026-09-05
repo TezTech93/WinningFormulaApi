@@ -1,12 +1,12 @@
 #Backend
-1.Add raw html copy of gamelines as an upload route option
+1.Add raw html copy of gamelines as an upload route option #COMPLETE#
 2.Add players/coaches names for all sports
 3.All player/coaches stats
 4.Add advanced stats for all sports
 
 #Frontend-Stats
 1.///Opponent name should be in game row 
-2.Stats should generate based on selected available option (currently only the gamelog)
+2.Stats should generate based on selected available option (currently only the gamelog) i.e. "advanced","40min",etc.
 
 #Frontend-FormulasComponent
 1.Make creating a predictive formula easier for the average person to understand,(ideas):
