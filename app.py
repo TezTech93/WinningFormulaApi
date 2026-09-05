@@ -77,13 +77,14 @@ async def startup_event():
         logger.error(f"Database initialization error: {e}")
 
 # Import routers
-from routers import auth, users, formulas, stats, players
+from routers import auth, users, formulas, stats, players, coaches
 
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(formulas.router)
 app.include_router(stats.router)
 app.include_router(players.router)
+app.include_router(coaches.router)
 
 # ============ Pydantic Models for Manual Input ============
 from typing import Union
