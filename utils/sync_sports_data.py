@@ -14,6 +14,9 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+# ---- IMPORTANT: import all models so SQLAlchemy registers every class ----
+import models  # noqa: F401  (this triggers models/__init__.py which imports every model)
+
 from core.database import SessionLocal
 from services.odds_api_service import OddsAPIService
 from services.sports_stats_fetcher import SportsStatsFetcher

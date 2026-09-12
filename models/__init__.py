@@ -17,6 +17,7 @@ __all__ = [
     'SeasonPhase',
     'Team',
     'TeamStats',
+    'Player',
     'UserPrediction',
     'PredictionType',
     'UserStrategy',

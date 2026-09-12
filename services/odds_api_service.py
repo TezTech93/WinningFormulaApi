@@ -6,10 +6,9 @@ for storage via GamelineManager.
 import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-
 import requests
 from sqlalchemy.orm import Session
-
+import models
 from core.config import settings
 from models.team import Team
 
