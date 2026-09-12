@@ -14,7 +14,7 @@ from typing import Optional
 
 import requests
 from sqlalchemy.orm import Session
-
+import models
 from core.config import settings
 from models.team import Team
 
