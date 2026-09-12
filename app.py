@@ -78,6 +78,7 @@ async def startup_event():
 
 # Import routers
 from routers import auth, users, formulas, stats, players, coaches
+from routers import admin_sync 
 
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -85,6 +86,7 @@ app.include_router(formulas.router)
 app.include_router(stats.router)
 app.include_router(players.router)
 app.include_router(coaches.router)
+app.include_router(admin_sync.router)
 
 # ============ Pydantic Models for Manual Input ============
 from typing import Union
