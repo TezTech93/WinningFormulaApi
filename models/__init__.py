@@ -3,6 +3,7 @@ from models.user import User, UserTier
 from models.formula import UserFormula, FormulaType
 from models.gamelines import Gameline
 from models.season_phase import SeasonPhase
+from models.players import Player 
 from models.team import Team, TeamStats
 from models.predictions import UserPrediction, PredictionType
 from models.strategy import UserStrategy, StrategyType, StrategyTip
