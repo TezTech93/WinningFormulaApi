@@ -28,3 +28,8 @@ marshmallow==3.26.1
 asyncio==3.4.3
 aiofiles==24.1.0
 typing-extensions==4.12.2
+nflreadpy>=0.1.5
+nba_api>=1.4
+pybaseball>=2.2
+nhl-api-py>=0.9
+CBBpy>=2.1

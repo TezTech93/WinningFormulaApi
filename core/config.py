@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     NHL_API_URL: str = os.getenv("NHL_API_URL", "https://nhlapi.onrender.com")
     NCAAF_API_URL: str = os.getenv("NCAAF_API_URL", "https://ncaafapi2.onrender.com")
     NCAAB_API_URL: str = os.getenv("NCAAB_API_URL", "https://ncaabapi.onrender.com")
+
+    # ---- Data provider API keys ----
+    ODDS_API_KEY: str = os.getenv("ODDS_API_KEY", "")
+    ODDS_PAPI_KEY: str = os.getenv("ODDS_PAPI_KEY","")
+    CFBD_API_KEY: str = os.getenv("CFBD_API_KEY", "")
     
     # User tiers
     TIER_LIMITS: dict = {
