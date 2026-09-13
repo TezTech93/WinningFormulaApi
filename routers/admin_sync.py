@@ -89,3 +89,19 @@ async def sync_all_stats(
         except Exception as e:
             results[sport] = f"error: {e}"
     return {"year": year, "results": results}
+
+from managers.gameline_manager import GamelineManager
+
+@router.post("/cleanup")
+async def cleanup_gamelines(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_token),
+):
+    """Purge past games and remove duplicates."""
+    gm = GamelineManager(db)
+    dupes = gm.dedupe_gamelines()
+    old = gm.purge_past_games(buffer_hours=3)
+    return {
+        "duplicates_removed": dupes,
+        "past_games_removed": old,
+    }
