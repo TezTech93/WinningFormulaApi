@@ -185,6 +185,60 @@ class GamelineManager:
             logger.info(f"Purged {count} past gamelines (cutoff {cutoff})")
         return count
 
+    def dedupe_by_matchup(self) -> int:
+        """
+        Remove duplicate gamelines that represent the same game:
+        same sport, same calendar day, same home team, same away team.
+        Keeps the newest row (highest id) for each matchup.
+        """
+        from sqlalchemy import func as sa_func
+
+        # Group by (sport, DATE(game_date), home_team_id, away_team_id)
+        dupes = (
+            self.db.query(
+                Gameline.sport,
+                sa_func.date(Gameline.game_date).label("gdate"),
+                Gameline.home_team_id,
+                Gameline.away_team_id,
+                sa_func.count(Gameline.id).label("cnt"),
+            )
+            .filter(
+                Gameline.home_team_id.isnot(None),
+                Gameline.away_team_id.isnot(None),
+            )
+            .group_by(
+                Gameline.sport,
+                sa_func.date(Gameline.game_date),
+                Gameline.home_team_id,
+                Gameline.away_team_id,
+            )
+            .having(sa_func.count(Gameline.id) > 1)
+            .all()
+        )
+
+        total_removed = 0
+        for sport, gdate, home_id, away_id, _ in dupes:
+            rows = (
+                self.db.query(Gameline)
+                .filter(
+                    Gameline.sport == sport,
+                    sa_func.date(Gameline.game_date) == gdate,
+                    Gameline.home_team_id == home_id,
+                    Gameline.away_team_id == away_id,
+                )
+                .order_by(Gameline.id.desc())
+                .all()
+            )
+            # Keep the newest row
+            for old in rows[1:]:
+                self.db.delete(old)
+                total_removed += 1
+
+        if total_removed:
+            self.db.commit()
+            logger.info(f"Removed {total_removed} duplicate gamelines (by matchup)")
+        return total_removed
+
     def dedupe_gamelines(self) -> int:
         """
         Remove duplicate gamelines that share (game_id, source).

@@ -119,9 +119,11 @@ class OddsAPIService:
         start_time = None
         if commence:
             try:
+                # Odds API returns UTC; parse and keep in UTC for storage
                 dt = datetime.fromisoformat(commence.replace("Z", "+00:00"))
                 game_date = dt.isoformat()
-                start_time = dt.strftime("%I:%M %p")
+                # Store 24-hour time — the frontend will convert to local AM/PM
+                start_time = dt.strftime("%H:%M")
             except Exception:
                 pass
 
