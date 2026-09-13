@@ -143,3 +143,79 @@ class GamelineManager:
             Gameline.game_date >= date,
             Gameline.game_date < date + timedelta(days=1)
         ).order_by(Gameline.game_date).all()
+
+    def _game_datetime(self, game: Gameline) -> Optional[datetime]:
+        """Combine game_date (midnight) with start_time string like '5:00 PM'."""
+        if not game.game_date:
+            return None
+        base = game.game_date
+        if isinstance(base, str):
+            try:
+                base = datetime.fromisoformat(base)
+            except Exception:
+                return None
+        if not game.start_time:
+            return base
+        try:
+            # Parse "5:00 PM"
+            parsed = datetime.strptime(game.start_time.strip(), "%I:%M %p").time()
+            return datetime.combine(base.date(), parsed)
+        except Exception:
+            return base
+
+    def purge_past_games(self, buffer_hours: int = 3) -> int:
+        """
+        Delete games whose start time (date + time) has passed by more than
+        `buffer_hours`. Keeps recently-started games around briefly for
+        final score updates.
+        """
+        cutoff = datetime.now() - timedelta(hours=buffer_hours)
+        games = self.db.query(Gameline).all()
+        to_delete = []
+        for g in games:
+            dt = self._game_datetime(g)
+            if dt and dt < cutoff:
+                to_delete.append(g)
+
+        count = len(to_delete)
+        for g in to_delete:
+            self.db.delete(g)
+        self.db.commit()
+        if count:
+            logger.info(f"Purged {count} past gamelines (cutoff {cutoff})")
+        return count
+
+    def dedupe_gamelines(self) -> int:
+        """
+        Remove duplicate gamelines that share (game_id, source).
+        Keeps the row with the highest id (most recent upsert).
+        """
+        # Find duplicate (game_id, source) combos
+        dupes = (
+            self.db.query(
+                Gameline.game_id,
+                Gameline.source,
+                func.count(Gameline.id).label("cnt"),
+            )
+            .group_by(Gameline.game_id, Gameline.source)
+            .having(func.count(Gameline.id) > 1)
+            .all()
+        )
+
+        total_removed = 0
+        for game_id, source, _ in dupes:
+            rows = (
+                self.db.query(Gameline)
+                .filter(Gameline.game_id == game_id, Gameline.source == source)
+                .order_by(Gameline.id.desc())
+                .all()
+            )
+            # Keep the newest, delete the rest
+            for old in rows[1:]:
+                self.db.delete(old)
+                total_removed += 1
+
+        if total_removed:
+            self.db.commit()
+            logger.info(f"Removed {total_removed} duplicate gamelines")
+        return total_removed
