@@ -38,10 +38,13 @@ def main():
     try:
         # ---- Cleanup first, always ----
         gm = GamelineManager(db)
-        removed_dupes = gm.dedupe_gamelines()
+        removed_a = gm.dedupe_gamelines()          # by (game_id, source)
+        removed_b = gm.dedupe_by_matchup()          # by (sport, date, home, away)
         removed_old = gm.purge_past_games(buffer_hours=3)
-        logger.info("Cleanup: %d duplicates, %d past games removed",
-                    removed_dupes, removed_old)
+        logger.info(
+            "Cleanup: %d id-dupes, %d matchup-dupes, %d past games",
+            removed_a, removed_b, removed_old,
+        )
 
         if args.cleanup_only:
             return
