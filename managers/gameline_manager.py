@@ -1,6 +1,6 @@
 # managers/gameline_manager.py
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
