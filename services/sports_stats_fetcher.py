@@ -1,9 +1,11 @@
 # services/sports_stats_fetcher.py
 """
-Fetches team stats for each supported sport using the appropriate package
-and persists them BOTH to per-team CSVs and to the TeamStats DB table.
+Fetches team stats for each supported sport and persists them BOTH to
+per-team CSVs and to the TeamStats DB table.
 
-Paths and filenames match what CSVStatsService expects.
+MLB uses the official MLB Stats API (statsapi.mlb.com) – free, no key,
+reliable. pybaseball is no longer used because schedule_and_record has
+been broken upstream for over a year.
 """
 import csv
 import logging
@@ -22,14 +24,24 @@ logger = logging.getLogger(__name__)
 
 DATA_DIR = Path("data")
 
-# Baseball Reference codes used by pybaseball differ from ESPN codes.
-PYBASEBALL_ABBR_MAP = {
-    "CWS": "CHW",
-    "KC":  "KCR",
-    "SD":  "SDP",
-    "SF":  "SFG",
-    "TB":  "TBR",
-    "WSH": "WSN",
+# ---------------------------------------------------------------------- #
+# MLB Stats API helpers
+# ---------------------------------------------------------------------- #
+MLB_API_BASE = "https://statsapi.mlb.com/api/v1"
+
+# Our ESPN-style abbreviations → MLB Stats API team IDs.
+# Source: https://statsapi.mlb.com/api/v1/teams?sportId=1
+MLB_TEAM_ID_MAP = {
+    "ARI": 109, "ATL": 144, "BAL": 110, "BOS": 111, "CHC": 112,
+    "CWS": 145, "CIN": 113, "CLE": 114, "COL": 115, "DET": 116,
+    "HOU": 117, "KC":  118, "LAA": 108, "LAD": 119, "MIA": 146,
+    "MIL": 158, "MIN": 142, "NYM": 121, "NYY": 147, "OAK": 133,
+    "PHI": 143, "PIT": 134, "SD":  135, "SF":  137, "SEA": 136,
+    "STL": 138, "TB":  139, "TEX": 140, "TOR": 141, "WSH": 120,
+    # Legacy / alternate codes for safety
+    "CHW": 145, "KCR": 118, "SDP": 135, "SFG": 137,
+    "TBR": 139, "WSN": 120, "OAK": 133,
+    "MON": 120,  # historical, just in case
 }
 
 # Columns that must NOT be summed when computing totals/averages.
@@ -140,7 +152,7 @@ class SportsStatsFetcher:
         if not rows:
             return False
 
-        # 1) Local CSV cache (still useful; used as a fallback by CSVStatsService)
+        # 1) Local CSV cache
         path = self._team_csv_path(sport, year, team.abbreviation)
         self._write_rows(path, rows)
 
@@ -288,7 +300,6 @@ class SportsStatsFetcher:
             except (TypeError, ValueError):
                 continue
 
-            # MATCHUP looks like "DET vs. CHI" or "DET @ CHI"
             matchup = str(g.get("MATCHUP", ""))
             opp = ""
             if " vs. " in matchup:
@@ -326,57 +337,95 @@ class SportsStatsFetcher:
         return rows
 
     # ================================================================== #
-    # MLB – pybaseball
+    # MLB – official MLB Stats API (no pybaseball, no auth)
     # ================================================================== #
     def _fetch_mlb(self, year: int, db: Session) -> int:
-        try:
-            from pybaseball import schedule_and_record
-        except ImportError:
-            logger.error("pybaseball not installed – run: pip install pybaseball")
+        db_teams = db.query(Team).filter(Team.sport == "mlb").all()
+        if not db_teams:
+            logger.warning("MLB: no teams in DB")
             return 0
 
-        db_teams = db.query(Team).filter(Team.sport == "mlb").all()
         written = 0
         for team in db_teams:
             abbr = team.abbreviation.upper()
-            bb_code = PYBASEBALL_ABBR_MAP.get(abbr, abbr)
+            team_id = MLB_TEAM_ID_MAP.get(abbr)
+            if not team_id:
+                logger.warning("MLB: no team ID mapping for %s", abbr)
+                continue
             try:
-                df = schedule_and_record(year, bb_code)
+                rows = self._mlb_fetch_team_games(team_id, year)
             except Exception as e:
-                logger.warning(
-                    "MLB fetch failed for %s (code %s): %s", abbr, bb_code, e
-                )
+                logger.warning("MLB API failed for %s (id %s): %s", abbr, team_id, e)
                 continue
-            if df is None or df.empty:
+            if not rows:
                 continue
-            rows = self._mlb_df_to_rows(df)
             if self._persist("mlb", year, team, rows, db):
                 written += 1
         logger.info("MLB: persisted %d team stat sets", written)
         return written
 
-    def _mlb_df_to_rows(self, df) -> list:
+    def _mlb_fetch_team_games(self, team_id: int, year: int) -> list:
+        """
+        Fetch one team's full regular-season schedule with final scores
+        from the official MLB Stats API.
+        """
+        url = f"{MLB_API_BASE}/schedule"
+        params = {
+            "sportId": 1,
+            "season": year,
+            "teamId": team_id,
+            "gameType": "R",     # Regular season
+            "fields": (
+                "dates,date,games,gamePk,status,abstractGameState,"
+                "teams,away,home,team,id,name,score,isWinner"
+            ),
+        }
+        r = requests.get(url, params=params, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+
         rows = []
-        for _, g in df.iterrows():
-            wl = str(g.get("W/L", "")).strip().upper()
-            if wl not in ("W", "L", "T"):
-                continue
-            try:
-                team_score = int(g.get("R", 0))
-                opp_score = int(g.get("RA", 0))
-            except (TypeError, ValueError):
-                continue
-            rows.append({
-                "Rk": len(rows) + 1,
-                "Date": str(g.get("Date", "")),
-                "Opp": str(g.get("Opp", "")).lstrip("@"),
-                "Opp_Score": opp_score,
-                "Rslt": wl,
-                "Tm": team_score,
-                "Home": str(g.get("Home", "")),
-                "W-L": str(g.get("W-L", "")),
-                "Streak": str(g.get("Streak", "")),
-            })
+        for date_block in data.get("dates", []):
+            game_date = date_block.get("date", "")
+            for game in date_block.get("games", []):
+                state = game.get("status", {}).get("abstractGameState", "")
+                if state != "Final":
+                    continue
+                teams = game.get("teams", {})
+                away = teams.get("away", {}) or {}
+                home = teams.get("home", {}) or {}
+                away_id = (away.get("team") or {}).get("id")
+                home_id = (home.get("team") or {}).get("id")
+
+                if away_id == team_id:
+                    team_score = away.get("score")
+                    opp_score = home.get("score")
+                    opp_name = (home.get("team") or {}).get("name", "")
+                    is_home = False
+                elif home_id == team_id:
+                    team_score = home.get("score")
+                    opp_score = away.get("score")
+                    opp_name = (away.get("team") or {}).get("name", "")
+                    is_home = True
+                else:
+                    continue
+
+                if team_score is None or opp_score is None:
+                    continue
+
+                result = (
+                    "W" if team_score > opp_score
+                    else ("L" if team_score < opp_score else "T")
+                )
+                rows.append({
+                    "Rk": len(rows) + 1,
+                    "Date": game_date,
+                    "Opp": opp_name,
+                    "Opp_Score": int(opp_score),
+                    "Rslt": result,
+                    "Tm": int(team_score),
+                    "Home": "H" if is_home else "A",
+                })
         return rows
 
     # ================================================================== #
