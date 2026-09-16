@@ -156,8 +156,55 @@ async def get_team_game_stats(
     year: int,
     abbr: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
+    if sport not in SUPPORTED_SPORTS:
+        raise HTTPException(400, f"Unsupported sport: {sport}")
+
+    team = (
+        db.query(Team)
+        .filter(Team.sport == sport, Team.abbreviation == abbr.upper())
+        .first()
+    )
+    if not team:
+        raise HTTPException(404, f"Team '{abbr}' not found in {sport}")
+
+    # 1) DB first
+    from models.team import TeamStats
+    row = (
+        db.query(TeamStats)
+        .filter(
+            TeamStats.team_id == team.id,
+            TeamStats.year == year,
+            TeamStats.season_type == "regular",
+        )
+        .first()
+    )
+    if row and row.stats:
+        return {
+            "sport": sport,
+            "year": year,
+            "team": abbr.upper(),
+            "source": "database",
+            **row.stats,
+        }
+
+    # 2) CSV fallback
+    stats = csv_service.get_team_season_stats(sport, year, abbr)
+    if not stats:
+        raise HTTPException(404, f"No stats found for {abbr} in {sport} {year}")
+
+    return {
+        "sport": sport,
+        "year": year,
+        "team": abbr.upper(),
+        "source": "csv",
+        "games": stats.get("game_rows", []),
+        "record": stats.get("record", {}),
+        "totals": stats.get("totals", {}),
+        "averages": stats.get("averages", {}),
+        "games_played": stats.get("games_played", 0),
+    }
     """
     Get raw game-by-game stats for a team from the CSV file.
     Returns a list of game rows with columns as keys.
