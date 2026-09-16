@@ -6,12 +6,132 @@ from typing import Optional
 from core.database import get_db
 from core.dependencies import get_current_user
 from models.user import User
-from models.team import Team
+from models.team import Team, TeamStats
 from services.csv_stats_service import CSVStatsService
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 csv_service = CSVStatsService()
 SUPPORTED_SPORTS = ["nfl", "nba", "nhl", "mlb", "ncaaf", "ncaab"]
+
+
+# ---------- Slug → DB abbreviation map ----------
+# Lets the API accept both DB codes ("OSU") and human slugs ("ohio-state").
+SLUG_TO_ABBR = {
+    "ncaaf": {
+        "ohio-state": "OSU",
+        "michigan-state": "MSU",
+        "penn-state": "PSU",
+        "notre-dame": "ND",
+        "north-carolina": "UNC",
+        "north-carolina-state": "NCST",
+        "florida-state": "FSU",
+        "wake-forest": "WAKE",
+        "virginia-tech": "VT",
+        "boise-state": "BSU",
+        "fresno-state": "FRES",
+        "san-diego-state": "SDSU",
+        "san-jose-state": "SJSU",
+        "colorado-state": "CSU",
+        "washington-state": "WSU",
+        "oregon-state": "ORST",
+        "arizona-state": "ASU",
+        "iowa-state": "ISU",
+        "kansas-state": "KSU",
+        "oklahoma-state": "OKST",
+        "app-state": "APP",
+        "georgia-state": "GAST",
+        "kennesaw-state": "KENN",
+        "jacksonville-state": "JVST",
+        "new-mexico-state": "NMSU",
+        "sam-houston": "SHSU",
+        "utah-state": "USU",
+        "weber-state": "WEB",
+        "youngstown-state": "YSU",
+    },
+    "ncaab": {
+        "michigan-state": "MSU",
+        "ohio-state": "OSU",
+        "penn-state": "PSU",
+        "notre-dame": "ND",
+        "north-carolina": "UNC",
+        "nc-state": "NCST",
+        "florida-state": "FSU",
+        "wake-forest": "WAKE",
+        "virginia-tech": "VT",
+        "boise-state": "BSU",
+        "fresno-state": "FRES",
+        "san-diego-state": "SDSU",
+        "colorado-state": "CSU",
+        "washington-state": "WSU",
+        "oregon-state": "ORST",
+        "arizona-state": "ASU",
+        "iowa-state": "ISU",
+        "kansas-state": "KSU",
+        "oklahoma-state": "OKST",
+        "georgia-state": "GAST",
+        "wichita-state": "WICH",
+        "murray-state": "MURR",
+        "indiana-state": "INST",
+        "illinois-state": "ILST",
+        "missouri-state": "MOSU",
+        "north-dakota-state": "NDSU",
+        "south-dakota-state": "SDSU",
+        "sam-houston-state": "SHSU",
+    },
+    "nfl": {
+        "green-bay": "GB",
+        "new-england": "NE",
+        "new-york-giants": "NYG",
+        "new-york-jets": "NYJ",
+        "san-francisco": "SF",
+        "tampa-bay": "TB",
+        "kansas-city": "KC",
+    },
+    "mlb": {
+        "new-york-yankees": "NYY",
+        "new-york-mets": "NYM",
+        "chicago-white-sox": "CWS",
+        "chicago-cubs": "CHC",
+        "los-angeles-angels": "LAA",
+        "los-angeles-dodgers": "LAD",
+        "san-francisco": "SF",
+        "san-diego": "SD",
+        "tampa-bay": "TB",
+        "kansas-city": "KC",
+        "st-louis": "STL",
+    },
+    "nba": {
+        "los-angeles-lakers": "LAL",
+        "los-angeles-clippers": "LAC",
+        "golden-state": "GSW",
+        "new-york-knicks": "NYK",
+        "brooklyn": "BKN",
+        "san-antonio": "SAS",
+        "oklahoma-city": "OKC",
+        "new-orleans": "NOP",
+        "portland": "POR",
+    },
+    "nhl": {
+        "detroit": "DET",
+        "toronto": "TOR",
+        "montreal": "MTL",
+        "new-york-rangers": "NYR",
+        "new-york-islanders": "NYI",
+        "new-jersey": "NJD",
+        "tampa-bay": "TB",
+        "los-angeles": "LAK",
+        "san-jose": "SJS",
+    },
+}
+
+
+def _resolve_abbr(sport: str, abbr: str) -> str:
+    """Accept either a DB abbreviation ('OSU') or a slug ('ohio-state')."""
+    a = abbr.upper().strip()
+    slug = abbr.lower().strip()
+    mapping = SLUG_TO_ABBR.get(sport, {})
+    return mapping.get(slug, a)
+
 
 # ---------- Public Stats Endpoints ----------
 
@@ -21,34 +141,26 @@ async def get_team_season_stats(
     team_name: str = Query(..., description="Full team name (e.g., Detroit Lions)"),
     year: int = Query(..., description="Season year (e.g., 2025)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    Get season totals, averages, and record for a specific team from its CSV file.
-    """
     if sport not in SUPPORTED_SPORTS:
         raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
 
-    # Look up team abbreviation from the database
     team = db.query(Team).filter(Team.sport == sport, Team.name == team_name).first()
     if not team:
         raise HTTPException(
             status_code=404,
-            detail=f"Team '{team_name}' not found in {sport}. Please check the name."
+            detail=f"Team '{team_name}' not found in {sport}. Please check the name.",
         )
 
     stats = csv_service.get_team_season_stats(sport, year, team.abbreviation)
     if not stats:
         raise HTTPException(
             status_code=404,
-            detail=f"No stats found for {team_name} ({team.abbreviation}) in {sport} {year}. The CSV file may be missing on GitHub or locally."
+            detail=f"No stats found for {team_name} ({team.abbreviation}) in {sport} {year}.",
         )
 
-    return {
-        "team": team_name,
-        "abbreviation": team.abbreviation,
-        **stats  # includes sport, year, games_played, record, totals, averages
-    }
+    return {"team": team_name, "abbreviation": team.abbreviation, **stats}
 
 
 @router.get("/team/trends")
@@ -58,11 +170,8 @@ async def get_team_trends(
     start_year: int = Query(2021, description="First year"),
     end_year: int = Query(2026, description="Last year"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    Get season statistics across multiple years for a team.
-    """
     if sport not in SUPPORTED_SPORTS:
         raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
 
@@ -81,27 +190,20 @@ async def get_team_trends(
         "team": team_name,
         "abbreviation": team.abbreviation,
         "years_range": [start_year, end_year],
-        "seasons": results
+        "seasons": results,
     }
 
 
 @router.get("/available")
 async def get_available_files(
     sport: Optional[str] = Query(None, description="Filter by sport"),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    List all CSV files currently cached locally.
-    """
     if sport and sport not in SUPPORTED_SPORTS:
         raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
-
     available = csv_service.list_available_files(sport)
     total = sum(len(teams) for years in available.values() for teams in years.values())
-    return {
-        "available": available,
-        "total_files": total
-    }
+    return {"available": available, "total_files": total}
 
 
 # ---------- Admin Sync Endpoints ----------
@@ -111,44 +213,28 @@ async def sync_team_csv(
     sport: str,
     year: int,
     abbr: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    Manually trigger download of a specific team's CSV from GitHub.
-    """
     if sport not in SUPPORTED_SPORTS:
         raise HTTPException(status_code=400, detail=f"Unsupported sport: {sport}")
 
     success = csv_service.download_csv(sport, year, abbr.upper())
     if success:
         return {"message": f"Successfully synced {sport}/{year}/{abbr.upper()}.csv"}
-    else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to sync {sport}/{year}/{abbr.upper()}.csv. Check GitHub URL and network."
-        )
+    raise HTTPException(
+        status_code=500,
+        detail=f"Failed to sync {sport}/{year}/{abbr.upper()}.csv.",
+    )
 
 
 @router.post("/sync/all")
-async def sync_all_csv(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Sync all teams for all sports and all years (2021-2026).
-    Note: This may take a while and hit GitHub rate limits.
-    """
-    results = {}
-    for sport in SUPPORTED_SPORTS:
-        results[sport] = {}
-        # You would need a list of all team abbreviations per sport.
-        # Since we don't have that here, we rely on the database.
-        # Better to sync on demand (individual teams) rather than all.
-        return {
-            "message": "Use /sync/{sport}/{year}/{abbr} for individual teams, or implement a team list from the database."
-        }
-    return results
+async def sync_all_csv(current_user: User = Depends(get_current_user)):
+    return {
+        "message": "Use /sync/{sport}/{year}/{abbr} for individual teams."
+    }
 
-# routers/stats.py (add this)
+
+# ---------- Game-by-game stats (DB first, CSV fallback) ----------
 
 @router.get("/games/{sport}/{year}/{abbr}")
 async def get_team_game_stats(
@@ -161,16 +247,17 @@ async def get_team_game_stats(
     if sport not in SUPPORTED_SPORTS:
         raise HTTPException(400, f"Unsupported sport: {sport}")
 
+    resolved = _resolve_abbr(sport, abbr)
+
     team = (
         db.query(Team)
-        .filter(Team.sport == sport, Team.abbreviation == abbr.upper())
+        .filter(Team.sport == sport, Team.abbreviation == resolved)
         .first()
     )
     if not team:
         raise HTTPException(404, f"Team '{abbr}' not found in {sport}")
 
     # 1) DB first
-    from models.team import TeamStats
     row = (
         db.query(TeamStats)
         .filter(
@@ -184,50 +271,24 @@ async def get_team_game_stats(
         return {
             "sport": sport,
             "year": year,
-            "team": abbr.upper(),
+            "team": team.abbreviation,
             "source": "database",
             **row.stats,
         }
 
     # 2) CSV fallback
-    stats = csv_service.get_team_season_stats(sport, year, abbr)
+    stats = csv_service.get_team_season_stats(sport, year, team.abbreviation)
     if not stats:
-        raise HTTPException(404, f"No stats found for {abbr} in {sport} {year}")
+        raise HTTPException(404, f"No stats found for {team.abbreviation} in {sport} {year}")
 
     return {
         "sport": sport,
         "year": year,
-        "team": abbr.upper(),
+        "team": team.abbreviation,
         "source": "csv",
         "games": stats.get("game_rows", []),
         "record": stats.get("record", {}),
         "totals": stats.get("totals", {}),
         "averages": stats.get("averages", {}),
         "games_played": stats.get("games_played", 0),
-    }
-    """
-    Get raw game-by-game stats for a team from the CSV file.
-    Returns a list of game rows with columns as keys.
-    """
-    if sport not in SUPPORTED_SPORTS:
-        raise HTTPException(400, f"Unsupported sport: {sport}")
-
-    # Optionally, validate that the team exists in the database
-    team = db.query(Team).filter(Team.sport == sport, Team.abbreviation == abbr.upper()).first()
-    if not team:
-        raise HTTPException(404, f"Team '{abbr}' not found in {sport}")
-
-    stats = csv_service.get_team_season_stats(sport, year, abbr)
-    if not stats:
-        raise HTTPException(404, f"No stats found for {abbr} in {sport} {year}")
-
-    # Return the game rows
-    return {
-        "sport": sport,
-        "year": year,
-        "team": abbr.upper(),
-        "games": stats.get("game_rows", []),
-        "record": stats.get("record", {}),
-        "totals": stats.get("totals", {}),
-        "averages": stats.get("averages", {})
     }
