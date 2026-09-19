@@ -268,12 +268,16 @@ async def get_team_game_stats(
         .first()
     )
     if row and row.stats:
+        payload = dict(row.stats)
+        # Frontend reads `games`, DB payload stores `game_rows` – normalize here.
+        if "games" not in payload and "game_rows" in payload:
+            payload["games"] = payload["game_rows"]
         return {
             "sport": sport,
             "year": year,
             "team": team.abbreviation,
             "source": "database",
-            **row.stats,
+            **payload,
         }
 
     # 2) CSV fallback
