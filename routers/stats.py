@@ -296,3 +296,19 @@ async def get_team_game_stats(
         "averages": stats.get("averages", {}),
         "games_played": stats.get("games_played", 0),
     }
+
+from services.sports_stats_fetcher import SportsStatsFetcher
+
+fetcher = SportsStatsFetcher()
+
+@router.post("/fetch/{sport}/{year}")
+async def fetch_team_stats(
+    sport: str,
+    year: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if sport not in SUPPORTED_SPORTS:
+        raise HTTPException(400, f"Unsupported sport: {sport}")
+    count = fetcher.fetch_and_save(sport, year, db)
+    return {"sport": sport, "year": year, "teams_written": count}
