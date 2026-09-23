@@ -107,6 +107,18 @@ def get_current_user_with_tier(required_tier: str = None):
     
     return _get_current_user_with_tier
 
+def require_active_subscription(current_user: User = Depends(get_current_user)):
+    """Dependency to check for an active subscription."""
+    if not current_user.subscription_status == "active":
+        raise HTTPException(status_code=403, detail="Active subscription required")
+    return current_user
+
+def require_plus_subscription(current_user: User = Depends(get_current_user)):
+    """Dependency to check for a Plus tier subscription."""
+    if not (current_user.subscription_status == "active" and current_user.subscription_tier == "plus"):
+        raise HTTPException(status_code=403, detail="Plus subscription required")
+    return current_user
+
 get_free_user = get_current_user_with_tier("FREE")
 get_paid_user = get_current_user_with_tier("PAID")
 get_plus_user = get_current_user_with_tier("PLUS")
