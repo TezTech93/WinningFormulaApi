@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from core.database import get_db
-from core.dependencies import get_current_user
+from core.dependencies import get_current_user,require_subscription
 from models.user import User
 from models.predictions import UserPrediction, PredictionType
 
@@ -73,7 +73,7 @@ def _to_response(p: UserPrediction) -> dict:
 async def create_prediction(
     data: PredictionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user,require_subscription),
 ):
     pred = UserPrediction(
         user_id=current_user.id,
@@ -98,7 +98,7 @@ async def list_predictions(
     sport: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user,require_subscription),
 ):
     q = db.query(UserPrediction).filter(UserPrediction.user_id == current_user.id)
     if sport:
@@ -114,7 +114,7 @@ async def update_result(
     prediction_id: int,
     data: ResultUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user,require_subscription),
 ):
     pred = (
         db.query(UserPrediction)
@@ -156,7 +156,7 @@ async def update_result(
 async def get_analytics(
     sport: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user,require_subscription),
 ):
     """Aggregate accuracy stats per sport and per formula."""
     q = db.query(UserPrediction).filter(
@@ -192,7 +192,7 @@ async def get_analytics(
 async def delete_prediction(
     prediction_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user,require_subscription),
 ):
     pred = (
         db.query(UserPrediction)
@@ -218,7 +218,7 @@ class SimulationRequest(BaseModel):
 async def simulate(
     req: SimulationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user,require_subscription),
 ):
     svc = SimulationService(db)
     results = svc.run(

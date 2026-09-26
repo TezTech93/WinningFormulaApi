@@ -24,17 +24,21 @@ class UserResponse(BaseModel):
     tier: str
     created_at: str
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(
-    current_user: User = Depends(get_current_user)
-):
-    """Get current user profile"""
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
-        "tier": current_user.tier.value,
-        "created_at": current_user.created_at.isoformat()
+        "is_superuser": current_user.is_superuser,
+        "subscription_status": current_user.subscription_status,
+        "subscription_tier": current_user.subscription_tier,
+        "subscription_source": current_user.subscription_source,
+        "subscription_current_period_end": (
+            current_user.subscription_current_period_end.isoformat()
+            if current_user.subscription_current_period_end else None
+        ),
+        "created_at": current_user.created_at.isoformat(),
     }
 
 @router.put("/me/password")

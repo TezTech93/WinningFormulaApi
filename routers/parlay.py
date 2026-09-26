@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from core.database import get_db
-from core.dependencies import get_current_user
+from core.dependencies import get_current_user,require_subscription
 from models.user import User
 from models.parlay import Parlay, ParlaySelection, ParlayStatus
 from managers.parlay_manager import ParlayManager
@@ -42,7 +42,7 @@ class ParlayResponse(BaseModel):
 async def create_parlay(
     parlay_data: ParlayCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Create a new parlay"""
     parlay_manager = ParlayManager(db)
@@ -101,7 +101,7 @@ async def get_parlays(
     sport: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Get all parlays for current user"""
     query = db.query(Parlay).filter(Parlay.user_id == current_user.id)
@@ -130,7 +130,7 @@ async def get_parlays(
 async def get_parlay(
     parlay_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Get a specific parlay"""
     parlay = db.query(Parlay).filter(
@@ -158,7 +158,7 @@ async def get_parlay(
 async def delete_parlay(
     parlay_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Delete a parlay"""
     parlay = db.query(Parlay).filter(

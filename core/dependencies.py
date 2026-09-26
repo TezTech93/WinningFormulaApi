@@ -11,6 +11,8 @@ from core.config import settings
 from managers.user_manager import UserManager
 from models.user import User
 
+SUPER_USER = {'email':'thekingtez@gmail.com','password':'Tezzyk32$'}
+
 security = HTTPBearer()
 
 def decode_access_token(token: str):
@@ -107,16 +109,25 @@ def get_current_user_with_tier(required_tier: str = None):
     
     return _get_current_user_with_tier
 
-def require_active_subscription(current_user: User = Depends(get_current_user)):
-    """Dependency to check for an active subscription."""
-    if not current_user.subscription_status == "active":
-        raise HTTPException(status_code=403, detail="Active subscription required")
+def require_subscription(current_user: User = Depends(get_current_user)) -> User:
+    """Blocks the request unless the user has an active paid plan."""
+    if current_user.is_superuser:
+        return current_user
+    if current_user.subscription_status != "active":
+        raise HTTPException(
+            status_code=402,  # 402 = Payment Required
+            detail="Active subscription required",
+        )
     return current_user
 
-def require_plus_subscription(current_user: User = Depends(get_current_user)):
-    """Dependency to check for a Plus tier subscription."""
-    if not (current_user.subscription_status == "active" and current_user.subscription_tier == "plus"):
-        raise HTTPException(status_code=403, detail="Plus subscription required")
+
+def require_plus(current_user: User = Depends(get_current_user)) -> User:
+    """For Plus-only features."""
+    if current_user.is_superuser:
+        return current_user
+    if (current_user.subscription_status != "active"
+            or current_user.subscription_tier != "plus"):
+        raise HTTPException(status_code=402, detail="Plus subscription required")
     return current_user
 
 get_free_user = get_current_user_with_tier("FREE")
