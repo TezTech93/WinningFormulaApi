@@ -36,7 +36,8 @@ class FormulaResponse(BaseModel):
 async def create_formula(
     formula_data: FormulaCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user,require_subscription)
+    current_user: User = Depends(get_current_user),
+    user_tier: User = Depends(require_subscription)
 ):
     """Create a new formula"""
     user_manager = UserManager(db)
@@ -73,7 +74,8 @@ async def create_formula(
 async def get_formulas(
     sport: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user,require_subscription)
+    current_user: User = Depends(get_current_user),
+    user_tier: User = Depends(require_subscription)
 ):
     """Get all formulas for current user"""
     formula_manager = FormulaManager(db)
@@ -98,7 +100,8 @@ async def get_formulas(
 async def get_formula(
     formula_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user,require_subscription)
+    current_user: User = Depends(get_current_user),
+    user_tier: User = Depends(require_subscription)
 ):
     """Get a specific formula"""
     formula_manager = FormulaManager(db)
@@ -123,7 +126,8 @@ async def update_formula(
     formula_id: int,
     formula_data: FormulaCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user,require_subscription)
+    current_user: User = Depends(get_current_user),
+    user_tier: User = Depends(require_subscription)
 ):
     """Update a formula"""
     formula_manager = FormulaManager(db)
@@ -153,7 +157,8 @@ async def update_formula(
 async def delete_formula(
     formula_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user,require_subscription)
+    current_user: User = Depends(get_current_user),
+    user_tier: User = Depends(require_subscription)
 ):
     """Delete a formula"""
     formula_manager = FormulaManager(db)
