@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from core.database import get_db
 from core.dependencies import get_current_user
+from core.dependencies import require_subscription
 from managers.formula_manager import FormulaManager
 from managers.user_manager import UserManager
 from models.user import User
@@ -35,7 +36,7 @@ class FormulaResponse(BaseModel):
 async def create_formula(
     formula_data: FormulaCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Create a new formula"""
     user_manager = UserManager(db)
@@ -72,7 +73,7 @@ async def create_formula(
 async def get_formulas(
     sport: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Get all formulas for current user"""
     formula_manager = FormulaManager(db)
@@ -97,7 +98,7 @@ async def get_formulas(
 async def get_formula(
     formula_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Get a specific formula"""
     formula_manager = FormulaManager(db)
@@ -122,7 +123,7 @@ async def update_formula(
     formula_id: int,
     formula_data: FormulaCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Update a formula"""
     formula_manager = FormulaManager(db)
@@ -152,7 +153,7 @@ async def update_formula(
 async def delete_formula(
     formula_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user,require_subscription)
 ):
     """Delete a formula"""
     formula_manager = FormulaManager(db)

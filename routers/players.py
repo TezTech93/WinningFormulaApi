@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from core.database import get_db
-from core.dependencies import get_current_user
+from core.dependencies import require_subscription
 from models.players import Player
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -12,7 +12,7 @@ async def get_players(
     team_id: int = Query(None, description="Filter by team ID"),
     search: str = Query(None, description="Search by name"),
     db: Session = Depends(get_db),
-    #current_user = Depends(get_current_user)
+    current_user = Depends(require_subscription)
 ):
     query = db.query(Player).filter(Player.sport == sport)
     if team_id:

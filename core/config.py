@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     ODDS_API_KEY: str = os.getenv("ODDS_API_KEY", "")
     ODDS_PAPI_KEY: str = os.getenv("ODDS_PAPI_KEY","")
     CFBD_API_KEY: str = os.getenv("CFBD_API_KEY", "")
+
+    # Superuser
+    SUPERUSER_EMAIL: str = ""            # the one account with full bypass
+    SUPERUSER_ACCESS_CODE: str = ""      # backup code to grant Plus without Stripe
+
+    # Stripe
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_STANDARD: str = ""
+    STRIPE_PRICE_PLUS: str = ""
     
     # User tiers
     TIER_LIMITS: dict = {
