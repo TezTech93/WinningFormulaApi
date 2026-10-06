@@ -88,6 +88,10 @@ app.include_router(players.router)
 app.include_router(coaches.router)
 app.include_router(admin_sync.router)
 
+from routers import billing
+
+app.include_router(billing.router)
+
 # ============ Pydantic Models for Manual Input ============
 from typing import Union
 
