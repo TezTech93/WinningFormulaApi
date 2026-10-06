@@ -33,3 +33,4 @@ nba_api>=1.4
 pybaseball>=2.2
 nhl-api-py>=0.9
 CBBpy>=2.1
+stripe>=10.0.0
