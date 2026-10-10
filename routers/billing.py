@@ -12,7 +12,6 @@ from models.user import User
 router = APIRouter(prefix="/billing", tags=["billing"])
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# Map our plan names to Stripe Price IDs (set in env)
 PLANS = {
     "standard": settings.STRIPE_PRICE_STANDARD,
     "plus": settings.STRIPE_PRICE_PLUS,
@@ -42,14 +41,16 @@ async def create_checkout_session(
                 metadata={"user_id": str(current_user.id)},
             )
         except stripe.error.StripeError as e:
-            raise HTTPException(500, f"Stripe customer creation failed: {e.user_message or str(e)}")
+            raise HTTPException(
+                500,
+                f"Stripe customer creation failed: {e.user_message or str(e)}",
+            )
         current_user.stripe_customer_id = customer.id
         db.commit()
 
     try:
         session = stripe.checkout.Session.create(
             customer=current_user.stripe_customer_id,
-            payment_method_types=["card"],
             line_items=[{"price": PLANS[body.plan], "quantity": 1}],
             mode="subscription",
             success_url="http://localhost:8081/?checkout=success",
@@ -60,7 +61,10 @@ async def create_checkout_session(
             },
         )
     except stripe.error.StripeError as e:
-        raise HTTPException(500, f"Stripe checkout failed: {e.user_message or str(e)}")
+        raise HTTPException(
+            500,
+            f"Stripe checkout failed: {e.user_message or str(e)}",
+        )
 
     return {"checkout_url": session.url}
 
@@ -77,7 +81,10 @@ async def create_portal_session(
             return_url="http://localhost:8081/",
         )
     except stripe.error.StripeError as e:
-        raise HTTPException(500, f"Stripe portal failed: {e.user_message or str(e)}")
+        raise HTTPException(
+            500,
+            f"Stripe portal failed: {e.user_message or str(e)}",
+        )
     return {"portal_url": session.url}
 
 
@@ -100,13 +107,16 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError:
         raise HTTPException(400, "Invalid signature")
 
-    # Open a fresh DB session — webhook runs outside the request scope
     from core.database import SessionLocal
     db = SessionLocal()
     try:
         event_type = event["type"]
 
-        if event_type in ("checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"):
+        if event_type in (
+            "checkout.session.completed",
+            "customer.subscription.created",
+            "customer.subscription.updated",
+        ):
             obj = event["data"]["object"]
             _handle_subscription_upsert(db, obj, event_type)
         elif event_type == "customer.subscription.deleted":
@@ -115,7 +125,6 @@ async def stripe_webhook(
         elif event_type == "invoice.payment_failed":
             obj = event["data"]["object"]
             _handle_payment_failed(db, obj)
-
     finally:
         db.close()
 
@@ -137,15 +146,12 @@ def _handle_subscription_upsert(db, obj, event_type):
         print(f"[stripe] webhook: no user for customer {customer_id}")
         return
 
-    # For checkout.session.completed, subscription fields live one level down
     sub_id = obj.get("subscription") or obj.get("id")
     status = obj.get("status") or "active"
 
-    plan = None
     metadata = obj.get("metadata") or {}
     plan = metadata.get("plan")
 
-    # Map status → our status vocabulary
     if status in ("active", "trialing"):
         our_status = "active"
     elif status in ("past_due", "unpaid"):
