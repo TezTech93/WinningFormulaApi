@@ -89,7 +89,9 @@ app.include_router(coaches.router)
 app.include_router(admin_sync.router)
 
 from routers import billing
+from routers import about
 
+app.include_router(about.router)
 app.include_router(billing.router)
 
 # ============ Pydantic Models for Manual Input ============
